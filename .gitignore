@@ -1,0 +1,43 @@
+# Build outputs
+obj/
+bin/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider
+.idea/
+*.sln.iml
+
+# VS Code
+.vscode/
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+*.lock.json
+
+# Logs
+*.log
+
+# Environment secrets (never commit)
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Publish output
+publish/
+out/
+
+# Coverage
+coverage/
+*.coverage
+*.coveragexml
+TestResults/

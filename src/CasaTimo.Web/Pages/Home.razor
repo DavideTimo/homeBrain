@@ -1,0 +1,184 @@
+@page "/"
+@using CasaTimo.Web.Services
+@inject SensorService Sensors
+@inject ReminderService Reminders
+
+<PageTitle>Casa Timò — Dashboard</PageTitle>
+
+<div class="container-fluid py-3">
+    @if (_reminders.Any())
+    {
+        <div class="reminder-banner">
+            <strong>⏰ Scadenze prossime:</strong>
+            @foreach (var r in _reminders)
+            {
+                <span class="ms-2">@r.Message (scade @r.DueDate.ToString("dd/MM"))</span>
+            }
+        </div>
+    }
+
+    <div class="d-flex align-items-center mb-3">
+        <h4 class="mb-0 me-2">Dashboard</h4>
+        <span class="live-dot"></span>
+        <small class="text-muted ms-1">live</small>
+    </div>
+
+    <!-- Energy Flow -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <h6 class="card-title text-muted">Flusso Energetico</h6>
+            <div class="energy-flow justify-content-center py-2">
+                <div class="energy-node text-center">
+                    <div>☀️ FV</div>
+                    <div>@_fvProduction.ToString("F1") kW</div>
+                </div>
+                <span class="energy-arrow">→</span>
+                <div class="energy-node text-center">
+                    <div>🔋 Batt</div>
+                    <div>@_batterySoc.ToString("F0")%</div>
+                </div>
+                <span class="energy-arrow">→</span>
+                <div class="energy-node text-center">
+                    <div>🏠 Casa</div>
+                    <div>@_houseConsumption.ToString("F1") kW</div>
+                </div>
+                <span class="energy-arrow">⇄</span>
+                <div class="energy-node text-center" style="background: #546e7a">
+                    <div>⚡ Rete</div>
+                    <div>@_gridExport.ToString("F1") kW</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- Battery -->
+        <div class="col-md-6 col-xl-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="sensor-label">🔋 Batteria LUNA 2000</div>
+                    <div class="sensor-value mt-1">@_batterySoc.ToString("F0")<span class="sensor-unit">%</span></div>
+                    <div class="battery-bar mt-2">
+                        <div class="battery-fill @GetBatteryClass(_batterySoc)" style="width: @_batterySoc%"></div>
+                    </div>
+                    <small class="text-muted">@GetBatteryStatus(_batterySoc)</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Heat Pump -->
+        <div class="col-md-6 col-xl-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="sensor-label">🌡️ Pompa di Calore</div>
+                    <div class="row mt-1">
+                        <div class="col-6">
+                            <div class="sensor-value" style="font-size:1.3rem">@_pdcSupply.ToString("F1")°</div>
+                            <small class="text-muted">Mandata</small>
+                        </div>
+                        <div class="col-6">
+                            <div class="sensor-value" style="font-size:1.3rem">@_pdcReturn.ToString("F1")°</div>
+                            <small class="text-muted">Ritorno</small>
+                        </div>
+                    </div>
+                    <div class="mt-1">
+                        <small class="text-muted">Esterna: @_pdcOutdoor.ToString("F1")°C &nbsp;|&nbsp; ACS: @_pdcDhw.ToString("F1")°C</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Solar Production -->
+        <div class="col-md-6 col-xl-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="sensor-label">☀️ Fotovoltaico</div>
+                    <div class="sensor-value mt-1">@_fvProduction.ToString("F2")<span class="sensor-unit">kW</span></div>
+                    <div class="mt-1">
+                        <small class="text-muted">Oggi: @_fvEnergyToday.ToString("F1") kWh</small><br/>
+                        <small class="text-muted">Esportata: @_gridExport.ToString("F2") kW</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wallbox -->
+        <div class="col-md-6 col-xl-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="sensor-label">🔌 Wallbox</div>
+                    <div class="sensor-value mt-1">@_wallboxPower.ToString("F1")<span class="sensor-unit">kW</span></div>
+                    <div class="mt-1">
+                        <span class="badge @(_wallboxPower > 0 ? "bg-success" : "bg-secondary")">
+                            @(_wallboxPower > 0 ? "Ricarica in corso" : "Inattivo")
+                        </span>
+                        @if (_wallboxPower > 0)
+                        {
+                            <br/><small class="text-muted">Sessione: @_wallboxSessionEnergy.ToString("F2") kWh</small>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private double _batterySoc = 0;
+    private double _fvProduction = 0;
+    private double _fvEnergyToday = 0;
+    private double _gridExport = 0;
+    private double _pdcSupply = 0;
+    private double _pdcReturn = 0;
+    private double _pdcDhw = 0;
+    private double _pdcOutdoor = 0;
+    private double _wallboxPower = 0;
+    private double _wallboxSessionEnergy = 0;
+    private double _houseConsumption = 0;
+    private List<ReminderDto> _reminders = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _reminders = await Reminders.GetActiveRemindersAsync();
+
+        await Sensors.ConnectAsync(OnSensorUpdate);
+    }
+
+    private void OnSensorUpdate(string topic, string payload)
+    {
+        if (!double.TryParse(payload, System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out var value))
+            return;
+
+        switch (topic)
+        {
+            case "casatimo/fv/battery/soc": _batterySoc = value; break;
+            case "casatimo/fv/power/production": _fvProduction = value; break;
+            case "casatimo/fv/energy/today": _fvEnergyToday = value; break;
+            case "casatimo/fv/grid/export": _gridExport = value; break;
+            case "casatimo/pdc/temperature/supply": _pdcSupply = value; break;
+            case "casatimo/pdc/temperature/return": _pdcReturn = value; break;
+            case "casatimo/pdc/dhw/temperature": _pdcDhw = value; break;
+            case "casatimo/pdc/temperature/outdoor": _pdcOutdoor = value; break;
+            case "casatimo/wallbox/power": _wallboxPower = value; break;
+            case "casatimo/wallbox/session/energy": _wallboxSessionEnergy = value; break;
+        }
+
+        _houseConsumption = _fvProduction - _gridExport;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private static string GetBatteryClass(double soc)
+    {
+        if (soc < 20) return "low";
+        if (soc < 50) return "medium";
+        return "";
+    }
+
+    private static string GetBatteryStatus(double soc)
+    {
+        if (soc < 20) return "⚠️ Bassa";
+        if (soc < 80) return "🔋 In carica";
+        return "✅ Carica";
+    }
+}

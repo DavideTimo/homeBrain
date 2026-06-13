@@ -1,0 +1,64 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{80003ADE-4CB5-4DDF-9CDB-323BE2C59383}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CasaTimo.Core", "src\CasaTimo.Core\CasaTimo.Core.csproj", "{9EBD43E6-0215-4FA3-BA3B-910D99736929}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CasaTimo.Infrastructure", "src\CasaTimo.Infrastructure\CasaTimo.Infrastructure.csproj", "{1D90779B-798A-455F-A9D4-84CE2927CBEA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CasaTimo.Api", "src\CasaTimo.Api\CasaTimo.Api.csproj", "{05AF1FAD-779C-48B4-9125-6393467356B6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CasaTimo.Workers", "src\CasaTimo.Workers\CasaTimo.Workers.csproj", "{74A2EFB5-96A1-41AB-AF58-00D5935E8F9F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CasaTimo.Web", "src\CasaTimo.Web\CasaTimo.Web.csproj", "{C7FFA270-6614-40D0-83C7-74358FD4BE27}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{73C2BA45-5D8C-4637-88FD-70DD36DB2E33}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CasaTimo.Tests", "tests\CasaTimo.Tests\CasaTimo.Tests.csproj", "{F6D6BDE4-50D9-43D8-9D43-D46BFE3FF7C6}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9EBD43E6-0215-4FA3-BA3B-910D99736929}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9EBD43E6-0215-4FA3-BA3B-910D99736929}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9EBD43E6-0215-4FA3-BA3B-910D99736929}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9EBD43E6-0215-4FA3-BA3B-910D99736929}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1D90779B-798A-455F-A9D4-84CE2927CBEA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1D90779B-798A-455F-A9D4-84CE2927CBEA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1D90779B-798A-455F-A9D4-84CE2927CBEA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1D90779B-798A-455F-A9D4-84CE2927CBEA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{05AF1FAD-779C-48B4-9125-6393467356B6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{05AF1FAD-779C-48B4-9125-6393467356B6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{05AF1FAD-779C-48B4-9125-6393467356B6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{05AF1FAD-779C-48B4-9125-6393467356B6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{74A2EFB5-96A1-41AB-AF58-00D5935E8F9F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{74A2EFB5-96A1-41AB-AF58-00D5935E8F9F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{74A2EFB5-96A1-41AB-AF58-00D5935E8F9F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{74A2EFB5-96A1-41AB-AF58-00D5935E8F9F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C7FFA270-6614-40D0-83C7-74358FD4BE27}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C7FFA270-6614-40D0-83C7-74358FD4BE27}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C7FFA270-6614-40D0-83C7-74358FD4BE27}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C7FFA270-6614-40D0-83C7-74358FD4BE27}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F6D6BDE4-50D9-43D8-9D43-D46BFE3FF7C6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F6D6BDE4-50D9-43D8-9D43-D46BFE3FF7C6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F6D6BDE4-50D9-43D8-9D43-D46BFE3FF7C6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F6D6BDE4-50D9-43D8-9D43-D46BFE3FF7C6}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{9EBD43E6-0215-4FA3-BA3B-910D99736929} = {80003ADE-4CB5-4DDF-9CDB-323BE2C59383}
+		{1D90779B-798A-455F-A9D4-84CE2927CBEA} = {80003ADE-4CB5-4DDF-9CDB-323BE2C59383}
+		{05AF1FAD-779C-48B4-9125-6393467356B6} = {80003ADE-4CB5-4DDF-9CDB-323BE2C59383}
+		{74A2EFB5-96A1-41AB-AF58-00D5935E8F9F} = {80003ADE-4CB5-4DDF-9CDB-323BE2C59383}
+		{C7FFA270-6614-40D0-83C7-74358FD4BE27} = {80003ADE-4CB5-4DDF-9CDB-323BE2C59383}
+		{F6D6BDE4-50D9-43D8-9D43-D46BFE3FF7C6} = {73C2BA45-5D8C-4637-88FD-70DD36DB2E33}
+	EndGlobalSection
+EndGlobal

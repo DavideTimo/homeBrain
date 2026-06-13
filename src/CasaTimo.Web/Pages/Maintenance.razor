@@ -1,0 +1,47 @@
+@page "/manutenzione"
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<PageTitle>Manutenzioni — Casa Timò</PageTitle>
+
+<div class="container-fluid py-3">
+    <h4 class="mb-3">🔧 Manutenzioni Impianti</h4>
+
+    <div class="card">
+        <div class="list-group list-group-flush">
+            @if (!_records.Any())
+            {
+                <div class="list-group-item text-muted text-center py-4">Nessuna manutenzione registrata</div>
+            }
+            @foreach (var r in _records)
+            {
+                <div class="list-group-item">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <strong>@r.DeviceId</strong> — @r.Description
+                            <br/><small class="text-muted">@r.Date.ToString("dd/MM/yyyy")@(r.Cost.HasValue ? $" | €{r.Cost:F0}" : "")</small>
+                        </div>
+                        @if (r.NextDueDate.HasValue)
+                        {
+                            <span class="badge @(r.NextDueDate.Value < DateTime.Now.AddDays(30) ? "bg-warning text-dark" : "bg-light text-dark") align-self-center">
+                                Prossima: @r.NextDueDate.Value.ToString("MM/yyyy")
+                            </span>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<MaintenanceDto> _records = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _records = await Http.GetFromJsonAsync<List<MaintenanceDto>>("/api/maintenance") ?? [];
+    }
+
+    private record MaintenanceDto(int Id, string DeviceId, string Description, DateTime Date,
+        decimal? Cost, DateTime? NextDueDate);
+}

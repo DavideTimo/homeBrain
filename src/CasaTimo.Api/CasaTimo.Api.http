@@ -1,0 +1,6 @@
+@CasaTimo.Api_HostAddress = http://localhost:5116
+
+GET {{CasaTimo.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

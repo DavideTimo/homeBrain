@@ -1,0 +1,42 @@
+version: "3.9"
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: casatimo-mosquitto
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: src/CasaTimo.Api/Dockerfile
+    container_name: casatimo-api
+    ports:
+      - "5000:8080"
+    env_file: .env
+    depends_on:
+      - mosquitto
+    volumes:
+      - nas_data:/mnt/nas/casatimo
+    restart: unless-stopped
+
+  workers:
+    build:
+      context: .
+      dockerfile: src/CasaTimo.Workers/Dockerfile
+    container_name: casatimo-workers
+    env_file: .env
+    depends_on:
+      - mosquitto
+    volumes:
+      - nas_data:/mnt/nas/casatimo
+    restart: unless-stopped
+
+volumes:
+  nas_data:
