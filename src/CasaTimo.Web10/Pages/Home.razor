@@ -1,6 +1,5 @@
 @page "/"
-@using CasaTimo.Web10.Models
-@using CasaTimo.Web10.Services
+@attribute [Authorize]
 @inject ApiClient Api
 @implements IDisposable
 
@@ -36,7 +35,7 @@
                 <div class="col-12 col-md-6 col-xl-4">
                     <div class="card h-100">
                         <div class="card-header fw-semibold">
-                            @group.Key
+                            @DeviceLabel(group.Key)
                         </div>
                         <div class="card-body p-0">
                             <table class="table table-sm mb-0">
@@ -52,7 +51,7 @@
                                     @foreach (var r in group.Value)
                                     {
                                         <tr>
-                                            <td>@r.Metric</td>
+                                            <td>@MetricLabel(r.Metric)</td>
                                             <td><strong>@r.Value.ToString("G4")</strong></td>
                                             <td>@(r.Unit ?? "—")</td>
                                             <td class="text-muted" style="font-size:0.8em">@r.Timestamp.ToLocalTime().ToString("HH:mm:ss")</td>
@@ -180,8 +179,41 @@
         }
     }
 
-    public void Dispose()
+    public void Dispose() => _timer?.Dispose();
+
+    private static string DeviceLabel(string deviceId) => deviceId.ToLower() switch
     {
-        _timer?.Dispose();
-    }
+        "pdc"  => "Pompa di Calore",
+        "fv"   => "Fotovoltaico & Batteria",
+        "vmc"  => "VMC",
+        "daikin" => "Clima Daikin",
+        "wallbox" => "Wallbox",
+        _ => deviceId.ToUpperInvariant()
+    };
+
+    private static string MetricLabel(string metric) => metric.ToLower() switch
+    {
+        "temperature/outside"     => "Temperatura esterna",
+        "temperature/supply"      => "Temperatura mandata",
+        "temperature/return"      => "Temperatura ritorno",
+        "dhw/temperature"         => "Acqua calda sanitaria",
+        "dhw/charging"            => "Ricarica ACS",
+        "power/consumption"       => "Consumo elettrico",
+        "power/output"            => "Potenza termica",
+        "compressor/hours"        => "Ore compressore",
+        "compressor/starts"       => "Avvii compressore",
+        "mode"                    => "Modalità",
+        "power/production"        => "Produzione FV",
+        "energy/today"            => "Energia oggi",
+        "battery/soc"             => "Carica batteria",
+        "battery/power"           => "Flusso batteria",
+        "battery/status"          => "Stato batteria",
+        "battery/temperature"     => "Temperatura batteria",
+        "grid/power"              => "Scambio rete",
+        "inverter/temperature"    => "Temperatura inverter",
+        "inverter/state"          => "Stato inverter",
+        "humidity/extract"        => "Umidità ripresa",
+        "humidity/supply"         => "Umidità mandata",
+        _ => metric
+    };
 }

@@ -1,6 +1,6 @@
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">Casa Tim&#242;</a>
+        <a class="navbar-brand fw-bold" href="">🏠 Casa Timò</a>
         <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -11,17 +11,17 @@
     <nav class="nav flex-column">
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Dashboard
+                <i class="bi bi-speedometer2 me-2"></i> Dashboard
             </NavLink>
         </div>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="bollette">
-                <span class="bi bi-receipt-nav-menu" aria-hidden="true"></span> Bollette
+                <i class="bi bi-receipt me-2"></i> Bollette
             </NavLink>
         </div>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="manutenzione">
-                <span class="bi bi-tools-nav-menu" aria-hidden="true"></span> Manutenzioni
+                <i class="bi bi-tools me-2"></i> Manutenzioni
             </NavLink>
         </div>
     </nav>
@@ -29,11 +29,6 @@
 
 @code {
     private bool collapseNavMenu = true;
-
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
-
-    private void ToggleNavMenu()
-    {
-        collapseNavMenu = !collapseNavMenu;
-    }
+    private void ToggleNavMenu() => collapseNavMenu = !collapseNavMenu;
 }
