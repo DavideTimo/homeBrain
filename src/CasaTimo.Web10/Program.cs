@@ -28,4 +28,7 @@ builder.Services.AddScoped<NotificationService>();
 // MudBlazor
 builder.Services.AddMudServices();
 
+// ApexCharts
+builder.Services.AddApexCharts();
+
 await builder.Build().RunAsync();

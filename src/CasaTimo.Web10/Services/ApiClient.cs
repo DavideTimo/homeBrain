@@ -99,4 +99,17 @@ public class ApiClient
         await SetAuthHeaderAsync();
         return await _http.GetFromJsonAsync<List<ConnectorStatusDto>>("api/connectors/status");
     }
+
+    public async Task<List<HistoryPointDto>?> GetHistoryAsync(string deviceId, string metric, DateTime from, DateTime to)
+    {
+        await SetAuthHeaderAsync();
+        return await _http.GetFromJsonAsync<List<HistoryPointDto>>(
+            $"api/sensors/history?deviceId={Uri.EscapeDataString(deviceId)}&metric={Uri.EscapeDataString(metric)}&from={from:O}&to={to:O}");
+    }
+
+    public async Task<SolarEfficiencyDto?> GetSolarEfficiencyAsync()
+    {
+        await SetAuthHeaderAsync();
+        return await _http.GetFromJsonAsync<SolarEfficiencyDto>("api/solar/efficiency");
+    }
 }

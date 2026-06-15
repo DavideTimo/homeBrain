@@ -7,3 +7,5 @@ public record ReminderDto(long Id, long BillId, DateTime DueDate, int DaysBefore
 public record MaintenanceRecordDto(long Id, string DeviceId, string? Description, DateTime Date, decimal? Cost, DateTime? NextDueDate);
 public record ConnectorConfigDto(int Id, string ConnectorName, string SettingsJson, DateTime UpdatedAt);
 public record ConnectorStatusDto(string ConnectorName, DateTime? LastPollAt, bool? IsHealthy, string? LastError);
+public record HistoryPointDto(DateTime Timestamp, double Value, string? Unit);
+public record SolarEfficiencyDto(double? ActualKwh, double? ExpectedKwh, double? PerformanceRatio, DateTime Date);

@@ -1,0 +1,142 @@
+@page "/storico"
+@attribute [Authorize]
+@inject ApiClient Api
+@using ApexCharts
+
+<PageTitle>Storico — Casa Timò</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">Storico</MudText>
+
+<MudButtonGroup Variant="Variant.Outlined" Class="mb-4">
+    <MudButton Color="@(_period == 1 ? Color.Primary : Color.Default)" OnClick="@(() => SetPeriod(1))">24h</MudButton>
+    <MudButton Color="@(_period == 7 ? Color.Primary : Color.Default)" OnClick="@(() => SetPeriod(7))">7 giorni</MudButton>
+    <MudButton Color="@(_period == 30 ? Color.Primary : Color.Default)" OnClick="@(() => SetPeriod(30))">30 giorni</MudButton>
+</MudButtonGroup>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Class="mb-4" />
+}
+
+<!-- FV + Batteria -->
+<MudText Typo="Typo.h6" Class="mb-2">☀️ Fotovoltaico &amp; Batteria</MudText>
+<MudPaper Class="mb-4 pa-2" Elevation="1">
+    @if (_fvData != null && _fvData.Count > 0)
+    {
+        <ApexChart TItem="HistoryPointDto" Title="" Options="_chartOptions">
+            <ApexPointSeries TItem="HistoryPointDto"
+                Items="_fvData.GetValueOrDefault("power/production") ?? new()"
+                Name="Produzione FV (kW)"
+                SeriesType="SeriesType.Line"
+                XValue="@(e => e.Timestamp.ToLocalTime())"
+                YValue="@(e => (decimal)e.Value)" />
+            <ApexPointSeries TItem="HistoryPointDto"
+                Items="_fvData.GetValueOrDefault("battery/soc") ?? new()"
+                Name="Carica batteria (%)"
+                SeriesType="SeriesType.Line"
+                XValue="@(e => e.Timestamp.ToLocalTime())"
+                YValue="@(e => (decimal)e.Value)" />
+            <ApexPointSeries TItem="HistoryPointDto"
+                Items="_fvData.GetValueOrDefault("grid/power") ?? new()"
+                Name="Scambio rete (kW)"
+                SeriesType="SeriesType.Line"
+                XValue="@(e => e.Timestamp.ToLocalTime())"
+                YValue="@(e => (decimal)e.Value)" />
+        </ApexChart>
+    }
+    else if (!_loading)
+    {
+        <MudAlert Severity="Severity.Normal">Nessun dato disponibile per il periodo selezionato.</MudAlert>
+    }
+</MudPaper>
+
+<!-- Pompa di Calore -->
+<MudText Typo="Typo.h6" Class="mb-2">🔥 Pompa di Calore</MudText>
+<MudPaper Class="mb-4 pa-2" Elevation="1">
+    @if (_pdcData != null && _pdcData.Count > 0)
+    {
+        <ApexChart TItem="HistoryPointDto" Title="" Options="_chartOptions">
+            <ApexPointSeries TItem="HistoryPointDto"
+                Items="_pdcData.GetValueOrDefault("power/consumption") ?? new()"
+                Name="Consumo elettrico (kW)"
+                SeriesType="SeriesType.Line"
+                XValue="@(e => e.Timestamp.ToLocalTime())"
+                YValue="@(e => (decimal)e.Value)" />
+            <ApexPointSeries TItem="HistoryPointDto"
+                Items="_pdcData.GetValueOrDefault("temperature/outside") ?? new()"
+                Name="Temp. esterna (°C)"
+                SeriesType="SeriesType.Line"
+                XValue="@(e => e.Timestamp.ToLocalTime())"
+                YValue="@(e => (decimal)e.Value)" />
+            <ApexPointSeries TItem="HistoryPointDto"
+                Items="_pdcData.GetValueOrDefault("temperature/supply") ?? new()"
+                Name="Temp. mandata (°C)"
+                SeriesType="SeriesType.Line"
+                XValue="@(e => e.Timestamp.ToLocalTime())"
+                YValue="@(e => (decimal)e.Value)" />
+        </ApexChart>
+    }
+    else if (!_loading)
+    {
+        <MudAlert Severity="Severity.Normal">Nessun dato disponibile per il periodo selezionato.</MudAlert>
+    }
+</MudPaper>
+
+@code {
+    private int _period = 1;
+    private bool _loading = true;
+    private Dictionary<string, List<HistoryPointDto>>? _fvData;
+    private Dictionary<string, List<HistoryPointDto>>? _pdcData;
+
+    private ApexChartOptions<HistoryPointDto> _chartOptions = new()
+    {
+        Chart = new Chart
+        {
+            Toolbar = new Toolbar { Show = false },
+            Zoom = new Zoom { Enabled = true, Type = ZoomType.X }
+        },
+        Stroke = new Stroke { Curve = Curve.Smooth, Width = new List<int> { 2, 2, 2 } },
+        Xaxis = new XAxis { Type = XAxisType.Datetime },
+        Tooltip = new Tooltip { X = new TooltipX { Format = "dd/MM HH:mm" } },
+        Legend = new Legend { Position = LegendPosition.Bottom },
+        Grid = new Grid { BorderColor = "#f0f0f0" }
+    };
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task SetPeriod(int days)
+    {
+        _period = days;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+        var to = DateTime.UtcNow;
+        var from = to.AddDays(-_period);
+
+        try
+        {
+            var fvMetrics = new[] { "power/production", "battery/soc", "grid/power" };
+            var pdcMetrics = new[] { "power/consumption", "temperature/outside", "temperature/supply" };
+
+            var fvTasks = fvMetrics.Select(m => Api.GetHistoryAsync("fv", m, from, to));
+            var pdcTasks = pdcMetrics.Select(m => Api.GetHistoryAsync("pdc", m, from, to));
+
+            var fvResults = await Task.WhenAll(fvTasks);
+            var pdcResults = await Task.WhenAll(pdcTasks);
+
+            _fvData = fvMetrics.Zip(fvResults)
+                .ToDictionary(x => x.First, x => x.Second ?? new List<HistoryPointDto>());
+            _pdcData = pdcMetrics.Zip(pdcResults)
+                .ToDictionary(x => x.First, x => x.Second ?? new List<HistoryPointDto>());
+        }
+        catch { }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

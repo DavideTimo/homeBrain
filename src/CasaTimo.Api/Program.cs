@@ -38,6 +38,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddHttpClient();
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
 builder.Services.AddCors(options =>
@@ -163,6 +164,56 @@ api.MapGet("/sensors/history", async (string? deviceId, string? metric, DateTime
     return Results.Ok(await query.OrderBy(r => r.Timestamp).ToListAsync());
 });
 
+api.MapGet("/solar/efficiency", async (
+    IHttpClientFactory httpFactory,
+    CasaTimoDbContext db,
+    IConfiguration config) =>
+{
+    // Get today's actual production from DB (energy/today latest value)
+    var today = DateTime.UtcNow.Date;
+    var actual = await db.SensorReadings
+        .Where(r => r.DeviceId == "fv" && r.Metric == "energy/today"
+                    && r.Timestamp >= today)
+        .OrderByDescending(r => r.Timestamp)
+        .Select(r => (double?)r.Value)
+        .FirstOrDefaultAsync();
+
+    // Get irradiation from Open-Meteo
+    var lat = config["Solar:Latitude"] ?? "44.41864";
+    var lon = config["Solar:Longitude"] ?? "11.98024";
+    var kwp = double.Parse(config["Solar:KWp"] ?? "8.61");
+    var pr = double.Parse(config["Solar:PR"] ?? "0.80");
+
+    var http = httpFactory.CreateClient();
+    double? expected = null;
+    try
+    {
+        var url = $"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&daily=shortwave_radiation_sum&timezone=Europe%2FRome&forecast_days=1";
+        var resp = await http.GetAsync(url);
+        if (resp.IsSuccessStatusCode)
+        {
+            var json = await resp.Content.ReadAsStringAsync();
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var rad = doc.RootElement
+                .GetProperty("daily")
+                .GetProperty("shortwave_radiation_sum")[0]
+                .GetDouble();
+            expected = rad * 0.2778 * kwp * pr;
+        }
+    }
+    catch { }
+
+    return Results.Ok(new
+    {
+        ActualKwh = actual,
+        ExpectedKwh = expected,
+        PerformanceRatio = (actual.HasValue && expected.HasValue && expected > 0)
+            ? Math.Round(actual.Value / expected.Value * 100, 1)
+            : (double?)null,
+        Date = today
+    });
+});
+
 api.MapGet("/bills", async (CasaTimoDbContext db) =>
     Results.Ok(await db.Bills.OrderByDescending(b => b.DueDate).ToListAsync()));
 
@@ -220,6 +271,42 @@ api.MapPost("/push/test", async (CasaTimoDbContext db, IConfiguration config, IL
 {
     await SendPushToAllAsync(db, config, logger, "Casa Timò", "Notifiche attive!", CancellationToken.None);
     return Results.Ok();
+});
+
+api.MapGet("/solar/efficiency", async (CasaTimoDbContext db, IConfiguration config, IHttpClientFactory httpFactory) =>
+{
+    var today = DateTime.UtcNow.Date;
+    var actual = await db.SensorReadings
+        .Where(r => r.DeviceId == "fv" && r.Metric == "energy/today" && r.Timestamp >= today)
+        .OrderByDescending(r => r.Timestamp)
+        .Select(r => (double?)r.Value)
+        .FirstOrDefaultAsync();
+
+    var lat = config["Solar:Latitude"] ?? "44.41864";
+    var lon = config["Solar:Longitude"] ?? "11.98024";
+    var kwp = double.TryParse(config["Solar:KWp"], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var k) ? k : 8.61;
+    var pr  = double.TryParse(config["Solar:PR"],  System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var p) ? p : 0.80;
+
+    double? expected = null;
+    try
+    {
+        var http = httpFactory.CreateClient();
+        var url = $"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&daily=shortwave_radiation_sum&timezone=Europe%2FRome&forecast_days=1";
+        var resp = await http.GetAsync(url);
+        if (resp.IsSuccessStatusCode)
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+            var rad = doc.RootElement.GetProperty("daily").GetProperty("shortwave_radiation_sum")[0].GetDouble();
+            expected = Math.Round(rad * 0.2778 * kwp * pr, 2);
+        }
+    }
+    catch { }
+
+    var ratio = (actual.HasValue && expected is > 0)
+        ? Math.Round(actual.Value / expected.Value * 100, 1)
+        : (double?)null;
+
+    return Results.Ok(new { ActualKwh = actual, ExpectedKwh = expected, PerformanceRatio = ratio, Date = today });
 });
 
 app.Run();

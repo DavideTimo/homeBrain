@@ -7,6 +7,45 @@
 
 <MudText Typo="Typo.h4" GutterBottom="true">Dashboard &mdash; Casa Timò</MudText>
 
+<!-- Efficienza Solare -->
+<MudText Typo="Typo.h6" Class="mb-2">☀️ Efficienza Solare Oggi</MudText>
+<MudCard Class="mb-4">
+    <MudCardContent>
+        @if (_efficiencyLoading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else if (_efficiency != null)
+        {
+            <MudGrid>
+                <MudItem xs="12" sm="4">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Produzione oggi</MudText>
+                    <MudText Typo="Typo.h6">@(_efficiency.ActualKwh.HasValue ? $"{_efficiency.ActualKwh:F1} kWh" : "—")</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Produzione attesa</MudText>
+                    <MudText Typo="Typo.h6">@(_efficiency.ExpectedKwh.HasValue ? $"{_efficiency.ExpectedKwh:F1} kWh" : "—")</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Performance Ratio</MudText>
+                    <MudText Typo="Typo.h6">@(_efficiency.PerformanceRatio.HasValue ? $"{_efficiency.PerformanceRatio:F1}%" : "—")</MudText>
+                    @if (_efficiency.PerformanceRatio.HasValue)
+                    {
+                        var pr = _efficiency.PerformanceRatio.Value;
+                        var color = pr >= 85 ? Color.Success : pr >= 70 ? Color.Warning : Color.Error;
+                        <MudProgressLinear Value="@Math.Min(pr, 100)" Color="@color" Class="mt-1" />
+                    }
+                </MudItem>
+            </MudGrid>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">Basato su irradiazione solare Open-Meteo</MudText>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Normal">Dati solare non disponibili.</MudAlert>
+        }
+    </MudCardContent>
+</MudCard>
+
 <MudText Typo="Typo.h5" Class="mb-2">Sensori Live</MudText>
 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3">Aggiornamento automatico ogni 30s</MudText>
 
@@ -104,6 +143,8 @@ else
 @code {
     private bool _sensorsLoading = true;
     private bool _remindersLoading = true;
+    private SolarEfficiencyDto? _efficiency;
+    private bool _efficiencyLoading = true;
     private string? _sensorsError;
     private string? _remindersError;
     private Dictionary<string, List<SensorReadingDto>>? _sensorGroups;
