@@ -128,22 +128,58 @@ public class ViessmannConnector : IHostedService, IDisposable
             }
         }
 
-        // Publish numeric sensor readings
+        // ── Temperature ───────────────────────────────────────────────────────
         await PublishNumericAsync(featureMap, "heating.sensors.temperature.outside",
             "value", "casatimo/pdc/temperature/outside", "°C", ct);
 
         await PublishNumericAsync(featureMap, "heating.circuits.0.sensors.temperature.supply",
             "value", "casatimo/pdc/temperature/supply", "°C", ct);
 
+        await PublishNumericAsync(featureMap, "heating.circuits.0.sensors.temperature.return",
+            "value", "casatimo/pdc/temperature/return", "°C", ct);
+
         await PublishNumericAsync(featureMap, "heating.dhw.sensors.temperature.hotWaterStorage",
             "value", "casatimo/pdc/dhw/temperature", "°C", ct);
 
+        // ── Power & energy ────────────────────────────────────────────────────
+        // Try multiple known feature paths for power consumption (varies by firmware)
+        if (!await PublishNumericAsync(featureMap, "heating.compressors.0.power.consumption",
+                "value", "casatimo/pdc/power/consumption", "kW", ct))
+            await PublishNumericAsync(featureMap, "heating.power.consumption",
+                "value", "casatimo/pdc/power/consumption", "kW", ct);
+
+        await PublishNumericAsync(featureMap, "heating.sensors.power.output",
+            "value", "casatimo/pdc/power/output", "kW", ct);
+
+        // ── Compressor ────────────────────────────────────────────────────────
         await PublishNumericAsync(featureMap, "heating.compressors.0.statistics.hours",
             "value", "casatimo/pdc/compressor/hours", "h", ct);
 
-        // Publish string mode
+        await PublishNumericAsync(featureMap, "heating.compressors.0.statistics.starts",
+            "value", "casatimo/pdc/compressor/starts", "", ct);
+
+        // ── Mode & status ─────────────────────────────────────────────────────
         await PublishStringAsync(featureMap, "heating.circuits.0.operating.modes.active",
             "value", "casatimo/pdc/mode", ct);
+
+        await PublishBoolAsync(featureMap, "heating.dhw.charging.active",
+            "value", "casatimo/pdc/dhw/charging", ct);
+
+        // ── VMC (Vitovent 100-D) — same gateway, different device feature set ─
+        await PublishStringAsync(featureMap, "ventilation.operating.modes.active",
+            "value", "casatimo/vmc/mode", ct);
+
+        await PublishNumericAsync(featureMap, "ventilation.sensors.humidity.extract",
+            "value", "casatimo/vmc/humidity/extract", "%", ct);
+
+        await PublishNumericAsync(featureMap, "ventilation.sensors.humidity.supply",
+            "value", "casatimo/vmc/humidity/supply", "%", ct);
+
+        await PublishNumericAsync(featureMap, "ventilation.sensors.temperature.extract",
+            "value", "casatimo/vmc/temperature/extract", "°C", ct);
+
+        await PublishNumericAsync(featureMap, "ventilation.sensors.temperature.supply",
+            "value", "casatimo/vmc/temperature/supply", "°C", ct);
     }
 
     private async Task<bool> DiscoverInstallationAsync(HttpClient client, string baseUrl, CancellationToken ct)
@@ -206,7 +242,7 @@ public class ViessmannConnector : IHostedService, IDisposable
         }
     }
 
-    private async Task PublishNumericAsync(
+    private async Task<bool> PublishNumericAsync(
         Dictionary<string, JsonElement> featureMap,
         string featureName,
         string propertyName,
@@ -217,28 +253,39 @@ public class ViessmannConnector : IHostedService, IDisposable
         if (!featureMap.TryGetValue(featureName, out var props))
         {
             _logger.LogDebug("ViessmannConnector: feature '{feature}' not found, skipping", featureName);
-            return;
+            return false;
         }
 
         if (!props.TryGetProperty(propertyName, out var propEl) ||
-            !propEl.TryGetProperty("value", out var valueEl))
+            !propEl.TryGetProperty("value", out var valueEl) ||
+            valueEl.ValueKind != JsonValueKind.Number)
         {
-            _logger.LogDebug("ViessmannConnector: property '{prop}' not found in feature '{feature}'", propertyName, featureName);
-            return;
+            _logger.LogDebug("ViessmannConnector: numeric value not found in '{feature}'.'{prop}'", featureName, propertyName);
+            return false;
         }
 
-        double numericValue;
-        if (valueEl.ValueKind == JsonValueKind.Number)
-            numericValue = valueEl.GetDouble();
-        else
-        {
-            _logger.LogDebug("ViessmannConnector: value of '{feature}'.'{prop}' is not a number", featureName, propertyName);
-            return;
-        }
-
-        var payload = numericValue.ToString("G6", System.Globalization.CultureInfo.InvariantCulture);
+        var payload = valueEl.GetDouble().ToString("G6", System.Globalization.CultureInfo.InvariantCulture);
         await _broker.PublishAsync(topic, payload, ct);
-        _logger.LogInformation("ViessmannConnector: published {topic} = {value} {unit}", topic, payload, unit);
+        _logger.LogInformation("ViessmannConnector: {topic} = {value} {unit}", topic, payload, unit);
+        return true;
+    }
+
+    private async Task PublishBoolAsync(
+        Dictionary<string, JsonElement> featureMap,
+        string featureName,
+        string propertyName,
+        string topic,
+        CancellationToken ct)
+    {
+        if (!featureMap.TryGetValue(featureName, out var props)) return;
+        if (!props.TryGetProperty(propertyName, out var propEl) ||
+            !propEl.TryGetProperty("value", out var valueEl)) return;
+
+        var payload = valueEl.ValueKind == JsonValueKind.True  ? "true"  :
+                      valueEl.ValueKind == JsonValueKind.False ? "false" :
+                      valueEl.ToString();
+        await _broker.PublishAsync(topic, payload, ct);
+        _logger.LogInformation("ViessmannConnector: {topic} = {value}", topic, payload);
     }
 
     private async Task PublishStringAsync(
