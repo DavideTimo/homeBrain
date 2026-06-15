@@ -9,4 +9,7 @@ public class ConnectorConfig
     // JSON blob with configuration for the connector (store secrets securely in production)
     public string SettingsJson { get; set; } = string.Empty;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? LastPollAt { get; set; }
+    public bool? IsHealthy { get; set; }
+    public string? LastError { get; set; }
 }

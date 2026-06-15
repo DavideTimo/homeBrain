@@ -80,6 +80,15 @@ partial class CasaTimoDbContextModelSnapshot : ModelSnapshot
                 .HasColumnType("TEXT")
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+            b.Property<DateTime?>("LastPollAt")
+                .HasColumnType("TEXT");
+
+            b.Property<bool?>("IsHealthy")
+                .HasColumnType("INTEGER");
+
+            b.Property<string>("LastError")
+                .HasColumnType("TEXT");
+
             b.HasKey("Id");
 
             b.ToTable("ConnectorConfigs");

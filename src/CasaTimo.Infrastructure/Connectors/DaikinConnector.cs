@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
 using CasaTimo.Infrastructure.Messaging;
+using CasaTimo.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -25,6 +26,7 @@ public class DaikinConnector : IHostedService, IDisposable
 {
     private readonly ILogger<DaikinConnector> _logger;
     private readonly IMessageBroker _broker;
+    private readonly ConnectorStatusReporter _statusReporter;
     private readonly DaikinOptions _options;
     private readonly HttpClient _http;
 
@@ -37,10 +39,12 @@ public class DaikinConnector : IHostedService, IDisposable
         IConfiguration configuration,
         ILogger<DaikinConnector> logger,
         IHttpClientFactory httpFactory,
-        IMessageBroker broker)
+        IMessageBroker broker,
+        ConnectorStatusReporter statusReporter)
     {
         _logger  = logger;
         _broker  = broker;
+        _statusReporter = statusReporter;
         _options = new DaikinOptions();
         configuration.GetSection("Daikin").Bind(_options);
         _http = httpFactory.CreateClient("daikin");
@@ -68,9 +72,14 @@ public class DaikinConnector : IHostedService, IDisposable
             {
                 if (!await EnsureTokenAsync(ct)) goto delay;
                 await PollDevicesAsync(ct);
+                await _statusReporter.ReportAsync("daikin", true, null, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
-            catch (Exception ex) { _logger.LogError(ex, "DaikinConnector: errore nel ciclo di polling"); }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "DaikinConnector: errore nel ciclo di polling");
+                await _statusReporter.ReportAsync("daikin", false, ex.Message, ct);
+            }
 
             delay:
             await Task.Delay(TimeSpan.FromSeconds(_options.PollIntervalSeconds), ct).ConfigureAwait(false);

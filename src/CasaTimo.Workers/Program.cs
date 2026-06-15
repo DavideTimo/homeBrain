@@ -1,6 +1,7 @@
 using CasaTimo.Workers;
 using CasaTimo.Infrastructure.Messaging;
 using CasaTimo.Infrastructure.Connectors;
+using CasaTimo.Infrastructure.Services;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -11,6 +12,8 @@ builder.Services.AddHttpClient<Worker>(c =>
 builder.Services.AddSingleton<MqttClientService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<MqttClientService>());
 builder.Services.AddSingleton<IMessageBroker>(sp => sp.GetRequiredService<MqttClientService>());
+
+builder.Services.AddSingleton<ConnectorStatusReporter>();
 
 // Connettori impianti
 builder.Services.AddHttpClient("viessmann");

@@ -93,4 +93,10 @@ public class ApiClient
         var resp = await _http.PostAsync("/api/push/test", null);
         resp.EnsureSuccessStatusCode();
     }
+
+    public async Task<List<ConnectorStatusDto>?> GetConnectorStatusAsync()
+    {
+        await SetAuthHeaderAsync();
+        return await _http.GetFromJsonAsync<List<ConnectorStatusDto>>("api/connectors/status");
+    }
 }

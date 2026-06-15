@@ -106,6 +106,14 @@ var api = app.MapGroup("/api").RequireAuthorization();
 api.MapGet("/connectors", async (CasaTimoDbContext db) =>
     Results.Ok(await db.ConnectorConfigs.ToListAsync()));
 
+api.MapGet("/connectors/status", async (CasaTimoDbContext db) =>
+{
+    var configs = await db.ConnectorConfigs
+        .Select(c => new { c.ConnectorName, c.LastPollAt, c.IsHealthy, c.LastError })
+        .ToListAsync();
+    return Results.Ok(configs);
+});
+
 api.MapGet("/connectors/{name}", async (string name, CasaTimoDbContext db) =>
 {
     var cfg = await db.ConnectorConfigs.FirstOrDefaultAsync(c => c.ConnectorName == name);

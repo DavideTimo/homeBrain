@@ -1,5 +1,6 @@
 @page "/impostazioni"
 @attribute [Authorize]
+@implements IDisposable
 @inject ApiClient Api
 @inject NotificationService PushService
 @inject IJSRuntime JS
@@ -56,7 +57,10 @@ else
         <MudExpansionPanel>
             <TitleContent>
                 <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
-                    <MudText><strong>Viessmann (PDC + VMC)</strong></MudText>
+                    <div style="display:flex; align-items:center;">
+                        <MudText><strong>Viessmann (PDC + VMC)</strong></MudText>
+                        @StatusChip("viessmann")
+                    </div>
                     @if (_viessmannUpdatedAt.HasValue)
                     {
                         <MudText Typo="Typo.caption" Color="Color.Secondary">Aggiornato: @_viessmannUpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</MudText>
@@ -96,7 +100,10 @@ else
         <MudExpansionPanel>
             <TitleContent>
                 <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
-                    <MudText><strong>Huawei FusionSolar</strong></MudText>
+                    <div style="display:flex; align-items:center;">
+                        <MudText><strong>Huawei FusionSolar</strong></MudText>
+                        @StatusChip("huawei")
+                    </div>
                     @if (_huaweiUpdatedAt.HasValue)
                     {
                         <MudText Typo="Typo.caption" Color="Color.Secondary">Aggiornato: @_huaweiUpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</MudText>
@@ -134,7 +141,10 @@ else
         <MudExpansionPanel>
             <TitleContent>
                 <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
-                    <MudText><strong>Daikin Cloud</strong></MudText>
+                    <div style="display:flex; align-items:center;">
+                        <MudText><strong>Daikin Cloud</strong></MudText>
+                        @StatusChip("daikin")
+                    </div>
                     @if (_daikinUpdatedAt.HasValue)
                     {
                         <MudText Typo="Typo.caption" Color="Color.Secondary">Aggiornato: @_daikinUpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</MudText>
@@ -235,6 +245,9 @@ else
 @code {
     private bool _loading = true;
 
+    private Dictionary<string, ConnectorStatusDto> _connectorStatus = new();
+    private Timer? _statusTimer;
+
     private bool _pushSupported;
     private bool _pushSubscribed;
     private bool _pushLoading;
@@ -282,7 +295,43 @@ else
 
         await LoadConnectorsAsync();
         _loading = false;
+        await LoadStatusAsync();
+        _statusTimer = new Timer(async _ => { await LoadStatusAsync(); await InvokeAsync(StateHasChanged); }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
+
+    public void Dispose() => _statusTimer?.Dispose();
+
+    private async Task LoadStatusAsync()
+    {
+        try
+        {
+            var list = await Api.GetConnectorStatusAsync();
+            _connectorStatus = list?.ToDictionary(s => s.ConnectorName, s => s)
+                ?? new Dictionary<string, ConnectorStatusDto>();
+        }
+        catch { }
+    }
+
+    private RenderFragment StatusChip(string name) => __builder =>
+    {
+        if (_connectorStatus.TryGetValue(name, out var s))
+        {
+            if (s.IsHealthy == true)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Success" Class="ml-2">Attivo</MudChip>
+            }
+            else if (s.IsHealthy == false)
+            {
+                <MudTooltip Text="@(s.LastError ?? "Errore sconosciuto")">
+                    <MudChip T="string" Size="Size.Small" Color="Color.Error" Class="ml-2">Errore</MudChip>
+                </MudTooltip>
+            }
+        }
+        else
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Default" Class="ml-2">Non configurato</MudChip>
+        }
+    };
 
     private async Task LoadConnectorsAsync()
     {

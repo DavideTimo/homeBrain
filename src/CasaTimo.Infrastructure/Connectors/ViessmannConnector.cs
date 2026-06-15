@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
 using CasaTimo.Infrastructure.Messaging;
+using CasaTimo.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -12,6 +13,7 @@ public class ViessmannConnector : IHostedService, IDisposable
     private readonly ILogger<ViessmannConnector> _logger;
     private readonly IHttpClientFactory _httpFactory;
     private readonly IMessageBroker _broker;
+    private readonly ConnectorStatusReporter _statusReporter;
     private readonly ViessmannOptions _options = new();
     private CancellationTokenSource? _cts;
     private Task? _loopTask;
@@ -24,11 +26,13 @@ public class ViessmannConnector : IHostedService, IDisposable
         IConfiguration configuration,
         ILogger<ViessmannConnector> logger,
         IHttpClientFactory httpFactory,
-        IMessageBroker broker)
+        IMessageBroker broker,
+        ConnectorStatusReporter statusReporter)
     {
         _logger = logger;
         _httpFactory = httpFactory;
         _broker = broker;
+        _statusReporter = statusReporter;
         configuration.GetSection("Viessmann").Bind(_options);
 
         // Pre-seed from config if provided
@@ -66,6 +70,7 @@ public class ViessmannConnector : IHostedService, IDisposable
                     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
                 await PollFeaturesAsync(client, ct);
+                await _statusReporter.ReportAsync("viessmann", true, null, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -74,6 +79,7 @@ public class ViessmannConnector : IHostedService, IDisposable
             catch (Exception ex)
             {
                 _logger.LogError(ex, "ViessmannConnector poll error");
+                await _statusReporter.ReportAsync("viessmann", false, ex.Message, ct);
             }
 
             await Task.Delay(TimeSpan.FromSeconds(_options.PollIntervalSeconds), ct).ConfigureAwait(false);

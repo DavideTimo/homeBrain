@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using CasaTimo.Infrastructure.Messaging;
+using CasaTimo.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -34,6 +35,7 @@ public class HuaweiConnector : IHostedService, IDisposable
 
     private readonly ILogger<HuaweiConnector> _logger;
     private readonly IMessageBroker _broker;
+    private readonly ConnectorStatusReporter _statusReporter;
     private readonly HuaweiOptions _options;
     private readonly HttpClient _http;
 
@@ -51,10 +53,12 @@ public class HuaweiConnector : IHostedService, IDisposable
         IConfiguration configuration,
         ILogger<HuaweiConnector> logger,
         IHttpClientFactory httpFactory,
-        IMessageBroker broker)
+        IMessageBroker broker,
+        ConnectorStatusReporter statusReporter)
     {
         _logger  = logger;
         _broker  = broker;
+        _statusReporter = statusReporter;
         _options = new HuaweiOptions();
         configuration.GetSection("Huawei").Bind(_options);
 
@@ -88,9 +92,14 @@ public class HuaweiConnector : IHostedService, IDisposable
                 if (!await EnsureSessionAsync(ct)) goto delay;
                 if (!await EnsureDiscoveryAsync(ct)) goto delay;
                 await PollAsync(ct);
+                await _statusReporter.ReportAsync("huawei", true, null, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
-            catch (Exception ex) { _logger.LogError(ex, "HuaweiConnector poll error"); }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "HuaweiConnector poll error");
+                await _statusReporter.ReportAsync("huawei", false, ex.Message, ct);
+            }
 
             delay:
             await Task.Delay(TimeSpan.FromSeconds(_options.PollIntervalSeconds), ct).ConfigureAwait(false);
