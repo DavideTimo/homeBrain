@@ -9,4 +9,6 @@ public class ViessmannOptions
     public string? Username { get; set; }
     public string? Password { get; set; }
     public int PollIntervalSeconds { get; set; } = 60;
+    public string? InstallationId { get; set; }
+    public string? GatewaySerial { get; set; }
 }

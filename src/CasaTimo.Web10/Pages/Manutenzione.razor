@@ -1,0 +1,198 @@
+@page "/manutenzione"
+@using CasaTimo.Web10.Models
+@using CasaTimo.Web10.Services
+@inject ApiClient Api
+
+<PageTitle>Manutenzioni &mdash; Casa Tim&#242;</PageTitle>
+
+<h1 class="mb-4">Manutenzioni</h1>
+
+@if (_loading)
+{
+    <div class="alert alert-info">Caricamento...</div>
+}
+else if (_error != null)
+{
+    <div class="alert alert-danger"><strong>Errore:</strong> @_error</div>
+}
+else
+{
+    <div class="row g-4">
+        <div class="col-12 col-lg-8">
+            <h2 class="h4 mb-3">Storico interventi</h2>
+            @if (_records == null || _records.Count == 0)
+            {
+                <div class="alert alert-secondary">Nessun intervento registrato.</div>
+            }
+            else
+            {
+                <div class="timeline">
+                    @foreach (var rec in _records.OrderByDescending(r => r.Date))
+                    {
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h5 class="card-title mb-1">@rec.DeviceId</h5>
+                                        <p class="card-text text-muted mb-1">@(rec.Description ?? "Nessuna descrizione")</p>
+                                        @if (rec.Cost.HasValue)
+                                        {
+                                            <span class="badge bg-secondary me-2">Costo: &euro;@rec.Cost.Value.ToString("N2")</span>
+                                        }
+                                        @if (rec.NextDueDate.HasValue)
+                                        {
+                                            var days = (int)(rec.NextDueDate.Value.Date - DateTime.Today).TotalDays;
+                                            var badgeClass = days < 0 ? "bg-danger" : days <= 30 ? "bg-warning text-dark" : "bg-info text-dark";
+                                            <span class="badge @badgeClass">Prossimo: @rec.NextDueDate.Value.ToString("dd/MM/yyyy")</span>
+                                        }
+                                    </div>
+                                    <span class="text-muted small">@rec.Date.ToString("dd/MM/yyyy")</span>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="col-12 col-lg-4">
+            <div class="card">
+                <div class="card-header fw-semibold">Aggiungi intervento</div>
+                <div class="card-body">
+                    @if (_formError != null)
+                    {
+                        <div class="alert alert-danger py-2">@_formError</div>
+                    }
+                    @if (_formSuccess)
+                    {
+                        <div class="alert alert-success py-2">Intervento aggiunto.</div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label">Dispositivo *</label>
+                        <select class="form-select" @bind="_form.DeviceId">
+                            <option value="">-- Seleziona --</option>
+                            @if (_devices != null)
+                            {
+                                @foreach (var d in _devices)
+                                {
+                                    <option value="@d.Id">@d.Name (@d.Id)</option>
+                                }
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Descrizione</label>
+                        <textarea class="form-control" rows="3" @bind="_form.Description"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Data intervento *</label>
+                        <input type="date" class="form-control" @bind="_form.Date" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Costo (&euro;)</label>
+                        <input type="number" step="0.01" class="form-control" @bind="_form.Cost" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Prossima scadenza</label>
+                        <input type="date" class="form-control" @bind="_form.NextDueDate" />
+                    </div>
+
+                    <button class="btn btn-primary w-100" @onclick="SubmitForm" disabled="@_submitting">
+                        @(_submitting ? "Salvataggio..." : "Aggiungi")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private string? _error;
+    private List<MaintenanceRecordDto>? _records;
+    private List<DeviceDto>? _devices;
+
+    private bool _submitting;
+    private string? _formError;
+    private bool _formSuccess;
+
+    private FormModel _form = new();
+
+    private class FormModel
+    {
+        public string DeviceId { get; set; } = "";
+        public string? Description { get; set; }
+        public DateTime Date { get; set; } = DateTime.Today;
+        public decimal? Cost { get; set; }
+        public DateTime? NextDueDate { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var recordsTask = Api.GetMaintenanceAsync();
+            var devicesTask = Api.GetDevicesAsync();
+            await Task.WhenAll(recordsTask, devicesTask);
+            _records = await recordsTask ?? new List<MaintenanceRecordDto>();
+            _devices = await devicesTask ?? new List<DeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SubmitForm()
+    {
+        _formError = null;
+        _formSuccess = false;
+
+        if (string.IsNullOrWhiteSpace(_form.DeviceId))
+        {
+            _formError = "Seleziona un dispositivo.";
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var dto = new MaintenanceRecordDto(
+                Id: 0,
+                DeviceId: _form.DeviceId,
+                Description: _form.Description,
+                Date: _form.Date,
+                Cost: _form.Cost,
+                NextDueDate: _form.NextDueDate
+            );
+            await Api.AddMaintenanceAsync(dto);
+            _formSuccess = true;
+            _form = new FormModel();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _formError = $"Errore: {ex.Message}";
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

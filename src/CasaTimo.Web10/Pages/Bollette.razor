@@ -1,0 +1,164 @@
+@page "/bollette"
+@using CasaTimo.Web10.Models
+@using CasaTimo.Web10.Services
+@inject ApiClient Api
+
+<PageTitle>Bollette &mdash; Casa Tim&#242;</PageTitle>
+
+<h1 class="mb-4">Bollette</h1>
+
+@if (_loading)
+{
+    <div class="alert alert-info">Caricamento bollette...</div>
+}
+else if (_error != null)
+{
+    <div class="alert alert-danger"><strong>Errore:</strong> @_error</div>
+}
+else
+{
+    <div class="mb-3 d-flex gap-2">
+        <button class="btn @(_filter == "all" ? "btn-primary" : "btn-outline-primary")" @onclick='() => SetFilter("all")'>Tutte</button>
+        <button class="btn @(_filter == "unpaid" ? "btn-warning" : "btn-outline-warning")" @onclick='() => SetFilter("unpaid")'>Da pagare</button>
+        <button class="btn @(_filter == "paid" ? "btn-success" : "btn-outline-success")" @onclick='() => SetFilter("paid")'>Pagate</button>
+    </div>
+
+    @if (_filtered == null || _filtered.Count == 0)
+    {
+        <div class="alert alert-secondary">Nessuna bolletta trovata.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Tipo</th>
+                        <th>Emittente</th>
+                        <th>Importo</th>
+                        <th>Scadenza</th>
+                        <th>Periodo</th>
+                        <th>Pagata</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var b in _filtered)
+                    {
+                        <tr>
+                            <td><span class="badge bg-secondary">@MapBillType(b.Type)</span></td>
+                            <td>@b.Issuer</td>
+                            <td><strong>&euro;@b.Amount.ToString("N2")</strong></td>
+                            <td>@b.DueDate.ToString("dd/MM/yyyy")</td>
+                            <td>
+                                @if (b.PeriodFrom.HasValue && b.PeriodTo.HasValue)
+                                {
+                                    <text>@b.PeriodFrom.Value.ToString("MMM yyyy") &ndash; @b.PeriodTo.Value.ToString("MMM yyyy")</text>
+                                }
+                                else
+                                {
+                                    <text>&mdash;</text>
+                                }
+                            </td>
+                            <td>
+                                @if (b.IsPaid)
+                                {
+                                    <span class="text-success fw-bold">&#10003;</span>
+                                }
+                                else
+                                {
+                                    <span class="text-danger">&#10007;</span>
+                                }
+                            </td>
+                            <td>
+                                @if (!b.IsPaid)
+                                {
+                                    <button class="btn btn-sm btn-outline-success" @onclick="() => MarkPaid(b.Id)" disabled="@_paying.Contains(b.Id)">
+                                        @(_paying.Contains(b.Id) ? "..." : "Segna pagata")
+                                    </button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    private bool _loading = true;
+    private string? _error;
+    private List<BillDto>? _bills;
+    private List<BillDto>? _filtered;
+    private string _filter = "all";
+    private HashSet<long> _paying = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _bills = await Api.GetBillsAsync() ?? new List<BillDto>();
+            ApplyFilter();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void SetFilter(string f)
+    {
+        _filter = f;
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        _filtered = _filter switch
+        {
+            "unpaid" => _bills?.Where(b => !b.IsPaid).ToList(),
+            "paid"   => _bills?.Where(b => b.IsPaid).ToList(),
+            _        => _bills?.ToList()
+        };
+    }
+
+    private async Task MarkPaid(long id)
+    {
+        _paying.Add(id);
+        try
+        {
+            await Api.MarkBillPaidAsync(id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Errore durante il salvataggio: {ex.Message}";
+        }
+        finally
+        {
+            _paying.Remove(id);
+        }
+    }
+
+    private static string MapBillType(int t) => t switch
+    {
+        0 => "Luce",
+        1 => "Acqua",
+        2 => "TARI",
+        3 => "Manutenzione",
+        4 => "Altro",
+        _ => $"Tipo {t}"
+    };
+}
