@@ -15,10 +15,13 @@ public class CasaTimoDbContext : DbContext
     public DbSet<Reminder> Reminders { get; set; }
     public DbSet<MaintenanceRecord> MaintenanceRecords { get; set; }
     public DbSet<ConnectorConfig> ConnectorConfigs { get; set; }
+    public DbSet<PushSubscription> PushSubscriptions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<PushSubscription>().HasKey(p => p.Id);
 
         modelBuilder.Entity<Device>().HasKey(d => d.Id);
 

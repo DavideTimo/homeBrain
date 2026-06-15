@@ -60,6 +60,51 @@
         };
     </script>
 
+    <script>
+        window.subscribePush = async (vapidPublicKey) => {
+            try {
+                const reg = await navigator.serviceWorker.ready;
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') return null;
+                const sub = await reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+                });
+                const json = sub.toJSON();
+                return {
+                    endpoint: json.endpoint,
+                    p256dh: json.keys?.p256dh ?? null,
+                    auth:   json.keys?.auth   ?? null
+                };
+            } catch(e) { console.error('subscribePush error:', e); return null; }
+        };
+
+        window.unsubscribePush = async () => {
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.getSubscription();
+            if (sub) await sub.unsubscribe();
+        };
+
+        window.getSubscriptionEndpoint = async () => {
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.getSubscription();
+            return sub?.endpoint ?? null;
+        };
+
+        window.isPushSubscribed = async () => {
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.getSubscription();
+            return !!sub;
+        };
+
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+        }
+    </script>
+
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
 </body>
 

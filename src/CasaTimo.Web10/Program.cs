@@ -22,5 +22,6 @@ builder.Services.AddAuthorizationCore();
 
 // API client
 builder.Services.AddScoped<ApiClient>();
+builder.Services.AddScoped<NotificationService>();
 
 await builder.Build().RunAsync();

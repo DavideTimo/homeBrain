@@ -1,0 +1,720 @@
+@page "/impostazioni"
+@attribute [Authorize]
+@inject ApiClient Api
+@inject NotificationService PushService
+@inject IJSRuntime JS
+
+<PageTitle>Impostazioni — Casa Timò</PageTitle>
+
+<h1 class="mb-2">Impostazioni</h1>
+<p class="text-muted mb-4">Le modifiche ai connettori richiedono il riavvio del servizio Workers per essere applicate.</p>
+
+<!-- Push notifications card -->
+<div class="card mb-4">
+    <div class="card-header fw-semibold">
+        <i class="bi bi-bell me-2"></i> Notifiche Push
+    </div>
+    <div class="card-body">
+        @if (!_pushSupported)
+        {
+            <p class="text-muted mb-0">Le notifiche push non sono supportate da questo browser.</p>
+        }
+        else if (_pushSubscribed)
+        {
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-success"><i class="bi bi-check-circle me-1"></i> Notifiche attive su questo dispositivo</span>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="DisableNotifications">Disabilita</button>
+                <button class="btn btn-sm btn-outline-primary" @onclick="SendTestNotification">Invia test</button>
+            </div>
+        }
+        else
+        {
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-muted">Ricevi notifiche push per le scadenze bollette.</span>
+                <button class="btn btn-sm btn-primary" @onclick="EnableNotifications" disabled="@_pushLoading">
+                    @(_pushLoading ? "..." : "Abilita notifiche")
+                </button>
+            </div>
+        }
+        @if (_pushMessage != null)
+        {
+            <div class="mt-2 small @(_pushError ? "text-danger" : "text-success")">@_pushMessage</div>
+        }
+    </div>
+</div>
+
+@if (_loading)
+{
+    <div class="alert alert-info">Caricamento...</div>
+}
+else
+{
+    <div class="accordion" id="settingsAccordion">
+
+        <!-- Viessmann -->
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="headingViessmann">
+                <button class="accordion-button collapsed" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#collapseViessmann"
+                        aria-expanded="false" aria-controls="collapseViessmann">
+                    <span class="fw-semibold">Viessmann (PDC + VMC)</span>
+                    @if (_viessmannUpdatedAt.HasValue)
+                    {
+                        <span class="ms-auto me-3 small text-muted">Aggiornato: @_viessmannUpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                    }
+                </button>
+            </h2>
+            <div id="collapseViessmann" class="accordion-collapse collapse"
+                 aria-labelledby="headingViessmann" data-bs-parent="#settingsAccordion">
+                <div class="accordion-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">API Base URL</label>
+                            <input class="form-control" @bind="_viessmann.ApiBaseUrl" placeholder="https://api.viessmann.com" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Token Endpoint</label>
+                            <input class="form-control" @bind="_viessmann.TokenEndpoint" placeholder="https://iam.viessmann.com/idp/v3/token" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Client ID</label>
+                            <input class="form-control" @bind="_viessmann.ClientId" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Client Secret</label>
+                            <input class="form-control" type="password" autocomplete="off" @bind="_viessmann.ClientSecret" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Installation ID <span class="text-muted">(opzionale)</span></label>
+                            <input class="form-control" @bind="_viessmann.InstallationId" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Gateway Serial <span class="text-muted">(opzionale)</span></label>
+                            <input class="form-control" @bind="_viessmann.GatewaySerial" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Intervallo di polling</label>
+                            <select class="form-select" @bind="_viessmannPollMinutes">
+                                <option value="60">1 min</option>
+                                <option value="300">5 min</option>
+                                <option value="600">10 min</option>
+                                <option value="900">15 min</option>
+                                <option value="1800">30 min</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-3 d-flex align-items-center gap-3">
+                        <button class="btn btn-primary" @onclick="SaveViessmann" disabled="@_viessmannSaving">
+                            @if (_viessmannSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            }
+                            Salva
+                        </button>
+                        @if (_viessmannMsg != null)
+                        {
+                            <span class="@(_viessmannError ? "text-danger" : "text-success") small">@_viessmannMsg</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Huawei FusionSolar -->
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="headingHuawei">
+                <button class="accordion-button collapsed" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#collapseHuawei"
+                        aria-expanded="false" aria-controls="collapseHuawei">
+                    <span class="fw-semibold">Huawei FusionSolar</span>
+                    @if (_huaweiUpdatedAt.HasValue)
+                    {
+                        <span class="ms-auto me-3 small text-muted">Aggiornato: @_huaweiUpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                    }
+                </button>
+            </h2>
+            <div id="collapseHuawei" class="accordion-collapse collapse"
+                 aria-labelledby="headingHuawei" data-bs-parent="#settingsAccordion">
+                <div class="accordion-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Base URL</label>
+                            <input class="form-control" @bind="_huawei.BaseUrl" placeholder="https://uni005eu5.fusionsolar.huawei.com" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Username</label>
+                            <input class="form-control" @bind="_huawei.UserName" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">System Code</label>
+                            <input class="form-control" type="password" autocomplete="off" @bind="_huawei.SystemCode" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Station Code <span class="text-muted">(opzionale)</span></label>
+                            <input class="form-control" @bind="_huawei.StationCode" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Intervallo di polling</label>
+                            <select class="form-select" @bind="_huaweiPollMinutes">
+                                <option value="60">1 min</option>
+                                <option value="300">5 min</option>
+                                <option value="600">10 min</option>
+                                <option value="900">15 min</option>
+                                <option value="1800">30 min</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-3 d-flex align-items-center gap-3">
+                        <button class="btn btn-primary" @onclick="SaveHuawei" disabled="@_huaweiSaving">
+                            @if (_huaweiSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            }
+                            Salva
+                        </button>
+                        @if (_huaweiMsg != null)
+                        {
+                            <span class="@(_huaweiError ? "text-danger" : "text-success") small">@_huaweiMsg</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Daikin Cloud -->
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="headingDaikin">
+                <button class="accordion-button collapsed" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#collapseDaikin"
+                        aria-expanded="false" aria-controls="collapseDaikin">
+                    <span class="fw-semibold">Daikin Cloud</span>
+                    @if (_daikinUpdatedAt.HasValue)
+                    {
+                        <span class="ms-auto me-3 small text-muted">Aggiornato: @_daikinUpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                    }
+                </button>
+            </h2>
+            <div id="collapseDaikin" class="accordion-collapse collapse"
+                 aria-labelledby="headingDaikin" data-bs-parent="#settingsAccordion">
+                <div class="accordion-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Token Endpoint</label>
+                            <input class="form-control" @bind="_daikin.TokenEndpoint" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">API Base URL</label>
+                            <input class="form-control" @bind="_daikin.ApiBaseUrl" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Client ID</label>
+                            <input class="form-control" @bind="_daikin.ClientId" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Username</label>
+                            <input class="form-control" @bind="_daikin.Username" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Password</label>
+                            <input class="form-control" type="password" autocomplete="off" @bind="_daikin.Password" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Intervallo di polling</label>
+                            <select class="form-select" @bind="_daikinPollMinutes">
+                                <option value="60">1 min</option>
+                                <option value="300">5 min</option>
+                                <option value="600">10 min</option>
+                                <option value="900">15 min</option>
+                                <option value="1800">30 min</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-3 d-flex align-items-center gap-3">
+                        <button class="btn btn-primary" @onclick="SaveDaikin" disabled="@_daikinSaving">
+                            @if (_daikinSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            }
+                            Salva
+                        </button>
+                        @if (_daikinMsg != null)
+                        {
+                            <span class="@(_daikinError ? "text-danger" : "text-success") small">@_daikinMsg</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wallbox OCPP -->
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="headingWallbox">
+                <button class="accordion-button collapsed" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#collapseWallbox"
+                        aria-expanded="false" aria-controls="collapseWallbox">
+                    <span class="fw-semibold">Wallbox OCPP</span>
+                    @if (_wallboxUpdatedAt.HasValue)
+                    {
+                        <span class="ms-auto me-3 small text-muted">Aggiornato: @_wallboxUpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                    }
+                </button>
+            </h2>
+            <div id="collapseWallbox" class="accordion-collapse collapse"
+                 aria-labelledby="headingWallbox" data-bs-parent="#settingsAccordion">
+                <div class="accordion-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Porta</label>
+                            <input class="form-control" type="number" @bind="_wallbox.Port" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Auth Key <span class="text-muted">(opzionale)</span></label>
+                            <input class="form-control" type="password" autocomplete="off" @bind="_wallbox.AuthKey" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Heartbeat Timeout (secondi)</label>
+                            <input class="form-control" type="number" @bind="_wallbox.HeartbeatTimeoutSeconds" />
+                        </div>
+                    </div>
+                    <div class="mt-3 d-flex align-items-center gap-3">
+                        <button class="btn btn-primary" @onclick="SaveWallbox" disabled="@_wallboxSaving">
+                            @if (_wallboxSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            }
+                            Salva
+                        </button>
+                        @if (_wallboxMsg != null)
+                        {
+                            <span class="@(_wallboxError ? "text-danger" : "text-success") small">@_wallboxMsg</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MQTT Broker -->
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="headingMqtt">
+                <button class="accordion-button collapsed" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#collapseMqtt"
+                        aria-expanded="false" aria-controls="collapseMqtt">
+                    <span class="fw-semibold">MQTT Broker</span>
+                    @if (_mqttUpdatedAt.HasValue)
+                    {
+                        <span class="ms-auto me-3 small text-muted">Aggiornato: @_mqttUpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                    }
+                </button>
+            </h2>
+            <div id="collapseMqtt" class="accordion-collapse collapse"
+                 aria-labelledby="headingMqtt" data-bs-parent="#settingsAccordion">
+                <div class="accordion-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Host</label>
+                            <input class="form-control" @bind="_mqtt.Host" placeholder="localhost" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Porta</label>
+                            <input class="form-control" type="number" @bind="_mqtt.Port" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Client ID</label>
+                            <input class="form-control" @bind="_mqtt.ClientId" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Username <span class="text-muted">(opzionale)</span></label>
+                            <input class="form-control" @bind="_mqtt.Username" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Password <span class="text-muted">(opzionale)</span></label>
+                            <input class="form-control" type="password" autocomplete="off" @bind="_mqtt.Password" />
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="mqttUseTls" @bind="_mqtt.UseTls" />
+                                <label class="form-check-label" for="mqttUseTls">Usa TLS</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3 d-flex align-items-center gap-3">
+                        <button class="btn btn-primary" @onclick="SaveMqtt" disabled="@_mqttSaving">
+                            @if (_mqttSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            }
+                            Salva
+                        </button>
+                        @if (_mqttMsg != null)
+                        {
+                            <span class="@(_mqttError ? "text-danger" : "text-success") small">@_mqttMsg</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+    // ── page state ────────────────────────────────────────────────────────────
+    private bool _loading = true;
+
+    // ── push notification state ───────────────────────────────────────────────
+    private bool _pushSupported;
+    private bool _pushSubscribed;
+    private bool _pushLoading;
+    private string? _pushMessage;
+    private bool _pushError;
+
+    // ── Viessmann ─────────────────────────────────────────────────────────────
+    private ViessmannSettings _viessmann = new();
+    private int _viessmannPollMinutes = 300;
+    private DateTime? _viessmannUpdatedAt;
+    private bool _viessmannSaving;
+    private string? _viessmannMsg;
+    private bool _viessmannError;
+
+    // ── Huawei FusionSolar ────────────────────────────────────────────────────
+    private HuaweiSettings _huawei = new();
+    private int _huaweiPollMinutes = 300;
+    private DateTime? _huaweiUpdatedAt;
+    private bool _huaweiSaving;
+    private string? _huaweiMsg;
+    private bool _huaweiError;
+
+    // ── Daikin Cloud ──────────────────────────────────────────────────────────
+    private DaikinSettings _daikin = new();
+    private int _daikinPollMinutes = 300;
+    private DateTime? _daikinUpdatedAt;
+    private bool _daikinSaving;
+    private string? _daikinMsg;
+    private bool _daikinError;
+
+    // ── Wallbox OCPP ──────────────────────────────────────────────────────────
+    private WallboxSettings _wallbox = new();
+    private DateTime? _wallboxUpdatedAt;
+    private bool _wallboxSaving;
+    private string? _wallboxMsg;
+    private bool _wallboxError;
+
+    // ── MQTT Broker ───────────────────────────────────────────────────────────
+    private MqttSettings _mqtt = new();
+    private DateTime? _mqttUpdatedAt;
+    private bool _mqttSaving;
+    private string? _mqttMsg;
+    private bool _mqttError;
+
+    // ── lifecycle ─────────────────────────────────────────────────────────────
+    protected override async Task OnInitializedAsync()
+    {
+        // Push support check
+        _pushSupported = await PushService.IsSupportedAsync();
+        if (_pushSupported)
+            _pushSubscribed = await PushService.IsSubscribedAsync();
+
+        // Load connector configs
+        await LoadConnectorsAsync();
+
+        _loading = false;
+    }
+
+    private async Task LoadConnectorsAsync()
+    {
+        await LoadConnector("viessmann", dto =>
+        {
+            _viessmannUpdatedAt = dto.UpdatedAt;
+            var s = Deserialize<ViessmannSettings>(dto.SettingsJson);
+            if (s != null)
+            {
+                _viessmann = s;
+                _viessmannPollMinutes = s.PollIntervalSeconds;
+            }
+        });
+
+        await LoadConnector("huawei", dto =>
+        {
+            _huaweiUpdatedAt = dto.UpdatedAt;
+            var s = Deserialize<HuaweiSettings>(dto.SettingsJson);
+            if (s != null)
+            {
+                _huawei = s;
+                _huaweiPollMinutes = s.PollIntervalSeconds;
+            }
+        });
+
+        await LoadConnector("daikin", dto =>
+        {
+            _daikinUpdatedAt = dto.UpdatedAt;
+            var s = Deserialize<DaikinSettings>(dto.SettingsJson);
+            if (s != null)
+            {
+                _daikin = s;
+                _daikinPollMinutes = s.PollIntervalSeconds;
+            }
+        });
+
+        await LoadConnector("wallbox", dto =>
+        {
+            _wallboxUpdatedAt = dto.UpdatedAt;
+            var s = Deserialize<WallboxSettings>(dto.SettingsJson);
+            if (s != null) _wallbox = s;
+        });
+
+        await LoadConnector("mqtt", dto =>
+        {
+            _mqttUpdatedAt = dto.UpdatedAt;
+            var s = Deserialize<MqttSettings>(dto.SettingsJson);
+            if (s != null) _mqtt = s;
+        });
+    }
+
+    private async Task LoadConnector(string name, Action<ConnectorConfigDto> apply)
+    {
+        try
+        {
+            var dto = await Api.GetConnectorConfigAsync(name);
+            if (dto != null) apply(dto);
+        }
+        catch { /* connector not yet configured — use defaults */ }
+    }
+
+    private static readonly System.Text.Json.JsonSerializerOptions _jsonOpts = new()
+    {
+        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    };
+
+    private static T? Deserialize<T>(string json)
+    {
+        try { return System.Text.Json.JsonSerializer.Deserialize<T>(json, _jsonOpts); }
+        catch { return default; }
+    }
+
+    private static string Serialize<T>(T obj)
+        => System.Text.Json.JsonSerializer.Serialize(obj, _jsonOpts);
+
+    // ── push notification methods ─────────────────────────────────────────────
+    private async Task EnableNotifications()
+    {
+        _pushLoading = true;
+        _pushMessage = null;
+        try
+        {
+            var ok = await PushService.SubscribeAsync();
+            if (ok)
+            {
+                _pushSubscribed = true;
+                _pushError = false;
+                _pushMessage = "Notifiche abilitate.";
+            }
+            else
+            {
+                _pushError = true;
+                _pushMessage = "Impossibile abilitare le notifiche. Controlla i permessi del browser.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _pushError = true;
+            _pushMessage = $"Errore: {ex.Message}";
+        }
+        finally
+        {
+            _pushLoading = false;
+        }
+    }
+
+    private async Task DisableNotifications()
+    {
+        _pushMessage = null;
+        try
+        {
+            await PushService.UnsubscribeAsync();
+            _pushSubscribed = false;
+            _pushError = false;
+            _pushMessage = "Notifiche disabilitate.";
+        }
+        catch (Exception ex)
+        {
+            _pushError = true;
+            _pushMessage = $"Errore: {ex.Message}";
+        }
+    }
+
+    private async Task SendTestNotification()
+    {
+        _pushMessage = null;
+        try
+        {
+            await Api.SendTestPushAsync();
+            _pushError = false;
+            _pushMessage = "Notifica di test inviata.";
+        }
+        catch (Exception ex)
+        {
+            _pushError = true;
+            _pushMessage = $"Errore: {ex.Message}";
+        }
+    }
+
+    // ── save helpers ──────────────────────────────────────────────────────────
+    private async Task SaveViessmann()
+    {
+        _viessmannSaving = true;
+        _viessmannMsg = null;
+        try
+        {
+            _viessmann.PollIntervalSeconds = _viessmannPollMinutes;
+            await Api.SaveConnectorConfigAsync("viessmann", Serialize(_viessmann));
+            _viessmannUpdatedAt = DateTime.Now;
+            _viessmannError = false;
+            _viessmannMsg = "✓ Salvato";
+            _ = ClearMsgAfterDelayAsync(() => _viessmannMsg = null);
+        }
+        catch (Exception ex)
+        {
+            _viessmannError = true;
+            _viessmannMsg = $"Errore: {ex.Message}";
+        }
+        finally { _viessmannSaving = false; }
+    }
+
+    private async Task SaveHuawei()
+    {
+        _huaweiSaving = true;
+        _huaweiMsg = null;
+        try
+        {
+            _huawei.PollIntervalSeconds = _huaweiPollMinutes;
+            await Api.SaveConnectorConfigAsync("huawei", Serialize(_huawei));
+            _huaweiUpdatedAt = DateTime.Now;
+            _huaweiError = false;
+            _huaweiMsg = "✓ Salvato";
+            _ = ClearMsgAfterDelayAsync(() => _huaweiMsg = null);
+        }
+        catch (Exception ex)
+        {
+            _huaweiError = true;
+            _huaweiMsg = $"Errore: {ex.Message}";
+        }
+        finally { _huaweiSaving = false; }
+    }
+
+    private async Task SaveDaikin()
+    {
+        _daikinSaving = true;
+        _daikinMsg = null;
+        try
+        {
+            _daikin.PollIntervalSeconds = _daikinPollMinutes;
+            await Api.SaveConnectorConfigAsync("daikin", Serialize(_daikin));
+            _daikinUpdatedAt = DateTime.Now;
+            _daikinError = false;
+            _daikinMsg = "✓ Salvato";
+            _ = ClearMsgAfterDelayAsync(() => _daikinMsg = null);
+        }
+        catch (Exception ex)
+        {
+            _daikinError = true;
+            _daikinMsg = $"Errore: {ex.Message}";
+        }
+        finally { _daikinSaving = false; }
+    }
+
+    private async Task SaveWallbox()
+    {
+        _wallboxSaving = true;
+        _wallboxMsg = null;
+        try
+        {
+            await Api.SaveConnectorConfigAsync("wallbox", Serialize(_wallbox));
+            _wallboxUpdatedAt = DateTime.Now;
+            _wallboxError = false;
+            _wallboxMsg = "✓ Salvato";
+            _ = ClearMsgAfterDelayAsync(() => _wallboxMsg = null);
+        }
+        catch (Exception ex)
+        {
+            _wallboxError = true;
+            _wallboxMsg = $"Errore: {ex.Message}";
+        }
+        finally { _wallboxSaving = false; }
+    }
+
+    private async Task SaveMqtt()
+    {
+        _mqttSaving = true;
+        _mqttMsg = null;
+        try
+        {
+            await Api.SaveConnectorConfigAsync("mqtt", Serialize(_mqtt));
+            _mqttUpdatedAt = DateTime.Now;
+            _mqttError = false;
+            _mqttMsg = "✓ Salvato";
+            _ = ClearMsgAfterDelayAsync(() => _mqttMsg = null);
+        }
+        catch (Exception ex)
+        {
+            _mqttError = true;
+            _mqttMsg = $"Errore: {ex.Message}";
+        }
+        finally { _mqttSaving = false; }
+    }
+
+    private async Task ClearMsgAfterDelayAsync(Action clear)
+    {
+        await Task.Delay(3000);
+        clear();
+        StateHasChanged();
+    }
+
+    // ── settings models ───────────────────────────────────────────────────────
+    private class ViessmannSettings
+    {
+        public string ApiBaseUrl { get; set; } = string.Empty;
+        public string TokenEndpoint { get; set; } = string.Empty;
+        public string ClientId { get; set; } = string.Empty;
+        public string ClientSecret { get; set; } = string.Empty;
+        public string? InstallationId { get; set; }
+        public string? GatewaySerial { get; set; }
+        public int PollIntervalSeconds { get; set; } = 300;
+    }
+
+    private class HuaweiSettings
+    {
+        public string BaseUrl { get; set; } = string.Empty;
+        public string UserName { get; set; } = string.Empty;
+        public string SystemCode { get; set; } = string.Empty;
+        public string? StationCode { get; set; }
+        public int PollIntervalSeconds { get; set; } = 300;
+    }
+
+    private class DaikinSettings
+    {
+        public string TokenEndpoint { get; set; } = string.Empty;
+        public string ApiBaseUrl { get; set; } = string.Empty;
+        public string ClientId { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public int PollIntervalSeconds { get; set; } = 300;
+    }
+
+    private class WallboxSettings
+    {
+        public int Port { get; set; } = 9000;
+        public string? AuthKey { get; set; }
+        public int HeartbeatTimeoutSeconds { get; set; } = 60;
+    }
+
+    private class MqttSettings
+    {
+        public string Host { get; set; } = string.Empty;
+        public int Port { get; set; } = 1883;
+        public string ClientId { get; set; } = string.Empty;
+        public string? Username { get; set; }
+        public string? Password { get; set; }
+        public bool UseTls { get; set; }
+    }
+}

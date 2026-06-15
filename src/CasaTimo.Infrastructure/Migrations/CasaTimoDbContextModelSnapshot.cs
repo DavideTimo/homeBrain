@@ -229,6 +229,35 @@ partial class CasaTimoDbContextModelSnapshot : ModelSnapshot
 
             b.Navigation("Device");
         });
+
+        modelBuilder.Entity("CasaTimo.Core.Models.PushSubscription", b =>
+        {
+            b.Property<int>("Id")
+                .ValueGeneratedOnAdd()
+                .HasColumnType("INTEGER");
+
+            b.Property<string>("Endpoint")
+                .IsRequired()
+                .HasColumnType("TEXT");
+
+            b.Property<string>("P256dh")
+                .HasColumnType("TEXT");
+
+            b.Property<string>("Auth")
+                .HasColumnType("TEXT");
+
+            b.Property<DateTime>("CreatedAt")
+                .ValueGeneratedOnAdd()
+                .HasColumnType("TEXT")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            b.HasKey("Id");
+
+            b.HasIndex("Endpoint")
+                .IsUnique();
+
+            b.ToTable("PushSubscriptions");
+        });
 #pragma warning restore 612, 618
     }
 }

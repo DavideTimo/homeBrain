@@ -6,6 +6,7 @@ using CasaTimo.Core.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using WebPush;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,6 +53,9 @@ builder.Services.AddCors(options =>
     });
 });
 
+// ── Hosted Services ───────────────────────────────────────────────────────────
+builder.Services.AddHostedService<ReminderNotifier>();
+
 var app = builder.Build();
 
 // ── DB Migration ──────────────────────────────────────────────────────────────
@@ -90,6 +94,11 @@ app.MapPost("/auth/login", (LoginRequest req, IConfiguration config) =>
 
     return Results.Ok(new { token = new JwtSecurityTokenHandler().WriteToken(token) });
 });
+
+// ── Push Notifications ────────────────────────────────────────────────────────
+// Public: return VAPID public key so Blazor can subscribe
+app.MapGet("/api/push/vapid-public-key", (IConfiguration config) =>
+    Results.Ok(new { publicKey = config["VapidKeys:PublicKey"] ?? string.Empty }));
 
 // ── Protected API endpoints ───────────────────────────────────────────────────
 var api = app.MapGroup("/api").RequireAuthorization();
@@ -171,6 +180,141 @@ api.MapPost("/maintenance", async (MaintenanceRecord record, CasaTimoDbContext d
     return Results.Created($"/api/maintenance/{record.Id}", record);
 });
 
+// Protected: save subscription
+api.MapPost("/push/subscribe", async (PushSubscriptionRequest req, CasaTimoDbContext db) =>
+{
+    if (string.IsNullOrEmpty(req.Endpoint)) return Results.BadRequest("endpoint required");
+    var existing = await db.PushSubscriptions
+        .FirstOrDefaultAsync(p => p.Endpoint == req.Endpoint);
+    if (existing == null)
+    {
+        db.PushSubscriptions.Add(new CasaTimo.Core.Models.PushSubscription
+        {
+            Endpoint = req.Endpoint,
+            P256dh   = req.P256dh,
+            Auth     = req.Auth
+        });
+        await db.SaveChangesAsync();
+    }
+    return Results.Ok();
+});
+
+// Protected: remove subscription
+api.MapDelete("/push/subscribe", async (string endpoint, CasaTimoDbContext db) =>
+{
+    var sub = await db.PushSubscriptions.FirstOrDefaultAsync(p => p.Endpoint == endpoint);
+    if (sub != null) { db.PushSubscriptions.Remove(sub); await db.SaveChangesAsync(); }
+    return Results.Ok();
+});
+
+// Protected: send test notification
+api.MapPost("/push/test", async (CasaTimoDbContext db, IConfiguration config, ILogger<Program> logger) =>
+{
+    await SendPushToAllAsync(db, config, logger, "Casa Timò", "Notifiche attive!", CancellationToken.None);
+    return Results.Ok();
+});
+
 app.Run();
 
+// ── Records ───────────────────────────────────────────────────────────────────
 record LoginRequest(string Username, string Password);
+record PushSubscriptionRequest(string Endpoint, string? P256dh, string? Auth);
+
+// ── Push helper ───────────────────────────────────────────────────────────────
+static async Task SendPushToAllAsync(
+    CasaTimoDbContext db,
+    IConfiguration config,
+    ILogger logger,
+    string title,
+    string body,
+    CancellationToken ct)
+{
+    var subs = await db.PushSubscriptions.ToListAsync(ct);
+    if (subs.Count == 0) return;
+
+    var publicKey  = config["VapidKeys:PublicKey"]  ?? string.Empty;
+    var privateKey = config["VapidKeys:PrivateKey"] ?? string.Empty;
+    var subject    = config["VapidKeys:Subject"]    ?? "mailto:casa@timo.local";
+
+    if (string.IsNullOrEmpty(publicKey) || string.IsNullOrEmpty(privateKey))
+    {
+        logger.LogWarning("VapidKeys non configurate, notifiche push non inviate");
+        return;
+    }
+
+    var vapidDetails = new VapidDetails(subject, publicKey, privateKey);
+    var client = new WebPushClient();
+    var payload = System.Text.Json.JsonSerializer.Serialize(new { title, body, icon = "/icon-192.png" });
+
+    foreach (var sub in subs)
+    {
+        try
+        {
+            var wsSub = new WebPushSubscription(sub.Endpoint, sub.P256dh, sub.Auth);
+            await client.SendNotificationAsync(wsSub, payload, vapidDetails, ct);
+        }
+        catch (WebPushException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Gone
+                                       || ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            // Subscription scaduta — rimuovila
+            db.PushSubscriptions.Remove(sub);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Errore invio push a {endpoint}", sub.Endpoint[..Math.Min(30, sub.Endpoint.Length)]);
+        }
+    }
+    await db.SaveChangesAsync(ct);
+}
+
+// ── Reminder Notifier Hosted Service ─────────────────────────────────────────
+public class ReminderNotifier : BackgroundService
+{
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IConfiguration _config;
+    private readonly ILogger<ReminderNotifier> _logger;
+
+    public ReminderNotifier(IServiceScopeFactory scopeFactory, IConfiguration config, ILogger<ReminderNotifier> logger)
+    {
+        _scopeFactory = scopeFactory;
+        _config = config;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken ct)
+    {
+        // Aspetta 30s all'avvio per lasciar partire l'app
+        await Task.Delay(TimeSpan.FromSeconds(30), ct);
+
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<CasaTimoDbContext>();
+
+                var upcoming = await db.Reminders
+                    .Where(r => !r.IsSent && r.DueDate <= DateTime.UtcNow.AddDays(7))
+                    .OrderBy(r => r.DueDate)
+                    .Take(5)
+                    .ToListAsync(ct);
+
+                foreach (var reminder in upcoming)
+                {
+                    var daysLeft = (int)(reminder.DueDate.Date - DateTime.Today).TotalDays;
+                    var title = daysLeft <= 0 ? "Scadenza oggi!" : $"Scadenza tra {daysLeft} giorni";
+                    var body  = reminder.Message ?? $"Bolletta #{reminder.BillId} scade il {reminder.DueDate:dd/MM/yyyy}";
+
+                    await SendPushToAllAsync(db, _config, _logger, title, body, ct);
+
+                    reminder.IsSent = true;
+                }
+                await db.SaveChangesAsync(ct);
+            }
+            catch (OperationCanceledException) { break; }
+            catch (Exception ex) { _logger.LogError(ex, "ReminderNotifier: errore"); }
+
+            await Task.Delay(TimeSpan.FromHours(1), ct);
+        }
+    }
+}

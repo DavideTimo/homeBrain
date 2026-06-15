@@ -65,4 +65,32 @@ public class ApiClient
         var resp = await _http.PostAsJsonAsync("/api/maintenance", record);
         resp.EnsureSuccessStatusCode();
     }
+
+    public async Task<List<ConnectorConfigDto>?> GetConnectorConfigsAsync()
+    {
+        await SetAuthHeaderAsync();
+        return await _http.GetFromJsonAsync<List<ConnectorConfigDto>>("/api/connectors");
+    }
+
+    public async Task<ConnectorConfigDto?> GetConnectorConfigAsync(string name)
+    {
+        await SetAuthHeaderAsync();
+        return await _http.GetFromJsonAsync<ConnectorConfigDto>($"/api/connectors/{name}");
+    }
+
+    public async Task SaveConnectorConfigAsync(string name, string settingsJson)
+    {
+        await SetAuthHeaderAsync();
+        var resp = await _http.PutAsync(
+            $"/api/connectors/{name}",
+            new StringContent(settingsJson, System.Text.Encoding.UTF8, "application/json"));
+        resp.EnsureSuccessStatusCode();
+    }
+
+    public async Task SendTestPushAsync()
+    {
+        await SetAuthHeaderAsync();
+        var resp = await _http.PostAsync("/api/push/test", null);
+        resp.EnsureSuccessStatusCode();
+    }
 }

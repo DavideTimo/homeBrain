@@ -5,6 +5,10 @@
     <ProjectReference Include="..\CasaTimo.Infrastructure\CasaTimo.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="WebPush" Version="1.0.11" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
