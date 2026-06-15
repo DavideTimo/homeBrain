@@ -4,110 +4,99 @@
 
 <PageTitle>Manutenzioni &mdash; Casa Tim&#242;</PageTitle>
 
-<h1 class="mb-4">Manutenzioni</h1>
+<MudText Typo="Typo.h4" Class="mb-4">Manutenzioni</MudText>
 
 @if (_loading)
 {
-    <div class="alert alert-info">Caricamento...</div>
+    <MudAlert Severity="Severity.Info">Caricamento...</MudAlert>
 }
 else if (_error != null)
 {
-    <div class="alert alert-danger"><strong>Errore:</strong> @_error</div>
+    <MudAlert Severity="Severity.Error">@_error</MudAlert>
 }
 else
 {
-    <div class="row g-4">
-        <div class="col-12 col-lg-8">
-            <h2 class="h4 mb-3">Storico interventi</h2>
+    <MudGrid>
+        <MudItem xs="12" lg="8">
+            <MudText Typo="Typo.h6" Class="mb-3">Storico interventi</MudText>
             @if (_records == null || _records.Count == 0)
             {
-                <div class="alert alert-secondary">Nessun intervento registrato.</div>
+                <MudAlert Severity="Severity.Normal">Nessun intervento registrato.</MudAlert>
             }
             else
             {
-                <div class="timeline">
-                    @foreach (var rec in _records.OrderByDescending(r => r.Date))
-                    {
-                        <div class="card mb-3">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-start">
-                                    <div>
-                                        <h5 class="card-title mb-1">@rec.DeviceId</h5>
-                                        <p class="card-text text-muted mb-1">@(rec.Description ?? "Nessuna descrizione")</p>
+                @foreach (var rec in _records.OrderByDescending(r => r.Date))
+                {
+                    <MudCard Class="mb-3">
+                        <MudCardContent>
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                                <div>
+                                    <MudText Typo="Typo.subtitle1"><strong>@rec.DeviceId</strong></MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">@(rec.Description ?? "Nessuna descrizione")</MudText>
+                                    <div class="mt-1">
                                         @if (rec.Cost.HasValue)
                                         {
-                                            <span class="badge bg-secondary me-2">Costo: &euro;@rec.Cost.Value.ToString("N2")</span>
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Default">Costo: &euro;@rec.Cost.Value.ToString("N2")</MudChip>
                                         }
                                         @if (rec.NextDueDate.HasValue)
                                         {
                                             var days = (int)(rec.NextDueDate.Value.Date - DateTime.Today).TotalDays;
-                                            var badgeClass = days < 0 ? "bg-danger" : days <= 30 ? "bg-warning text-dark" : "bg-info text-dark";
-                                            <span class="badge @badgeClass">Prossimo: @rec.NextDueDate.Value.ToString("dd/MM/yyyy")</span>
+                                            var color = days < 0 ? Color.Error : days <= 30 ? Color.Warning : Color.Info;
+                                            <MudChip T="string" Size="Size.Small" Color="@color">Prossimo: @rec.NextDueDate.Value.ToString("dd/MM/yyyy")</MudChip>
                                         }
                                     </div>
-                                    <span class="text-muted small">@rec.Date.ToString("dd/MM/yyyy")</span>
                                 </div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@rec.Date.ToString("dd/MM/yyyy")</MudText>
                             </div>
-                        </div>
-                    }
-                </div>
+                        </MudCardContent>
+                    </MudCard>
+                }
             }
-        </div>
+        </MudItem>
 
-        <div class="col-12 col-lg-4">
-            <div class="card">
-                <div class="card-header fw-semibold">Aggiungi intervento</div>
-                <div class="card-body">
+        <MudItem xs="12" lg="4">
+            <MudCard>
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Aggiungi intervento</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
                     @if (_formError != null)
                     {
-                        <div class="alert alert-danger py-2">@_formError</div>
+                        <MudAlert Severity="Severity.Error" Class="mb-3">@_formError</MudAlert>
                     }
                     @if (_formSuccess)
                     {
-                        <div class="alert alert-success py-2">Intervento aggiunto.</div>
+                        <MudAlert Severity="Severity.Success" Class="mb-3">Intervento aggiunto.</MudAlert>
                     }
 
-                    <div class="mb-3">
-                        <label class="form-label">Dispositivo *</label>
-                        <select class="form-select" @bind="_form.DeviceId">
-                            <option value="">-- Seleziona --</option>
-                            @if (_devices != null)
+                    <MudSelect T="string" Label="Dispositivo *" @bind-Value="_form.DeviceId" Class="mb-3">
+                        @if (_devices != null)
+                        {
+                            @foreach (var d in _devices)
                             {
-                                @foreach (var d in _devices)
-                                {
-                                    <option value="@d.Id">@d.Name (@d.Id)</option>
-                                }
+                                <MudSelectItem Value="@d.Id">@d.Name (@d.Id)</MudSelectItem>
                             }
-                        </select>
-                    </div>
+                        }
+                    </MudSelect>
 
-                    <div class="mb-3">
-                        <label class="form-label">Descrizione</label>
-                        <textarea class="form-control" rows="3" @bind="_form.Description"></textarea>
-                    </div>
+                    <MudTextField T="string" Label="Descrizione" Lines="3" @bind-Value="_form.Description" Class="mb-3" />
 
-                    <div class="mb-3">
-                        <label class="form-label">Data intervento *</label>
-                        <input type="date" class="form-control" @bind="_form.Date" />
-                    </div>
+                    <MudDatePicker Label="Data intervento *" @bind-Date="_formDate" Class="mb-3" />
 
-                    <div class="mb-3">
-                        <label class="form-label">Costo (&euro;)</label>
-                        <input type="number" step="0.01" class="form-control" @bind="_form.Cost" />
-                    </div>
+                    <MudTextField T="decimal?" Label="Costo (euro)" @bind-Value="_form.Cost" Class="mb-3" />
 
-                    <div class="mb-3">
-                        <label class="form-label">Prossima scadenza</label>
-                        <input type="date" class="form-control" @bind="_form.NextDueDate" />
-                    </div>
+                    <MudDatePicker Label="Prossima scadenza" @bind-Date="_formNextDue" Class="mb-3" />
 
-                    <button class="btn btn-primary w-100" @onclick="SubmitForm" disabled="@_submitting">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                               OnClick="SubmitForm" Disabled="@_submitting">
                         @(_submitting ? "Salvataggio..." : "Aggiungi")
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
+                    </MudButton>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
 }
 
 @code {
@@ -121,14 +110,14 @@ else
     private bool _formSuccess;
 
     private FormModel _form = new();
+    private DateTime? _formDate = DateTime.Today;
+    private DateTime? _formNextDue;
 
     private class FormModel
     {
         public string DeviceId { get; set; } = "";
         public string? Description { get; set; }
-        public DateTime Date { get; set; } = DateTime.Today;
         public decimal? Cost { get; set; }
-        public DateTime? NextDueDate { get; set; }
     }
 
     protected override async Task OnInitializedAsync()
@@ -176,13 +165,15 @@ else
                 Id: 0,
                 DeviceId: _form.DeviceId,
                 Description: _form.Description,
-                Date: _form.Date,
+                Date: _formDate ?? DateTime.Today,
                 Cost: _form.Cost,
-                NextDueDate: _form.NextDueDate
+                NextDueDate: _formNextDue
             );
             await Api.AddMaintenanceAsync(dto);
             _formSuccess = true;
             _form = new FormModel();
+            _formDate = DateTime.Today;
+            _formNextDue = null;
             await LoadAsync();
         }
         catch (Exception ex)

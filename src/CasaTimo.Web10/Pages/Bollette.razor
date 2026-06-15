@@ -2,86 +2,87 @@
 @attribute [Authorize]
 @inject ApiClient Api
 
-<PageTitle>Bollette &mdash; Casa Tim&#242;</PageTitle>
+<PageTitle>Bollette &mdash; Casa Timò</PageTitle>
 
-<h1 class="mb-4">Bollette</h1>
+<MudText Typo="Typo.h4" GutterBottom="true">Bollette</MudText>
 
 @if (_loading)
 {
-    <div class="alert alert-info">Caricamento bollette...</div>
+    <MudAlert Severity="Severity.Info">Caricamento bollette...</MudAlert>
 }
 else if (_error != null)
 {
-    <div class="alert alert-danger"><strong>Errore:</strong> @_error</div>
+    <MudAlert Severity="Severity.Error"><strong>Errore:</strong> @_error</MudAlert>
 }
 else
 {
-    <div class="mb-3 d-flex gap-2">
-        <button class="btn @(_filter == "all" ? "btn-primary" : "btn-outline-primary")" @onclick='() => SetFilter("all")'>Tutte</button>
-        <button class="btn @(_filter == "unpaid" ? "btn-warning" : "btn-outline-warning")" @onclick='() => SetFilter("unpaid")'>Da pagare</button>
-        <button class="btn @(_filter == "paid" ? "btn-success" : "btn-outline-success")" @onclick='() => SetFilter("paid")'>Pagate</button>
-    </div>
+    <MudButtonGroup Class="mb-4" Variant="Variant.Outlined">
+        <MudButton Color="@(_filter == "all" ? Color.Primary : Color.Default)"
+                   Variant="@(_filter == "all" ? Variant.Filled : Variant.Outlined)"
+                   OnClick='() => SetFilter("all")'>Tutte</MudButton>
+        <MudButton Color="@(_filter == "unpaid" ? Color.Warning : Color.Default)"
+                   Variant="@(_filter == "unpaid" ? Variant.Filled : Variant.Outlined)"
+                   OnClick='() => SetFilter("unpaid")'>Da pagare</MudButton>
+        <MudButton Color="@(_filter == "paid" ? Color.Success : Color.Default)"
+                   Variant="@(_filter == "paid" ? Variant.Filled : Variant.Outlined)"
+                   OnClick='() => SetFilter("paid")'>Pagate</MudButton>
+    </MudButtonGroup>
 
     @if (_filtered == null || _filtered.Count == 0)
     {
-        <div class="alert alert-secondary">Nessuna bolletta trovata.</div>
+        <MudAlert Severity="Severity.Normal">Nessuna bolletta trovata.</MudAlert>
     }
     else
     {
-        <div class="table-responsive">
-            <table class="table table-striped table-hover align-middle">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Tipo</th>
-                        <th>Emittente</th>
-                        <th>Importo</th>
-                        <th>Scadenza</th>
-                        <th>Periodo</th>
-                        <th>Pagata</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var b in _filtered)
+        <MudTable Items="@_filtered" Striped="true" Hover="true" Dense="false">
+            <HeaderContent>
+                <MudTh>Tipo</MudTh>
+                <MudTh>Emittente</MudTh>
+                <MudTh>Importo</MudTh>
+                <MudTh>Scadenza</MudTh>
+                <MudTh>Periodo</MudTh>
+                <MudTh>Pagata</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd><MudChip T="string" Size="Size.Small" Color="Color.Secondary">@MapBillType(context.Type)</MudChip></MudTd>
+                <MudTd>@context.Issuer</MudTd>
+                <MudTd><strong>&euro;@context.Amount.ToString("N2")</strong></MudTd>
+                <MudTd>@context.DueDate.ToString("dd/MM/yyyy")</MudTd>
+                <MudTd>
+                    @if (context.PeriodFrom.HasValue && context.PeriodTo.HasValue)
                     {
-                        <tr>
-                            <td><span class="badge bg-secondary">@MapBillType(b.Type)</span></td>
-                            <td>@b.Issuer</td>
-                            <td><strong>&euro;@b.Amount.ToString("N2")</strong></td>
-                            <td>@b.DueDate.ToString("dd/MM/yyyy")</td>
-                            <td>
-                                @if (b.PeriodFrom.HasValue && b.PeriodTo.HasValue)
-                                {
-                                    <text>@b.PeriodFrom.Value.ToString("MMM yyyy") &ndash; @b.PeriodTo.Value.ToString("MMM yyyy")</text>
-                                }
-                                else
-                                {
-                                    <text>&mdash;</text>
-                                }
-                            </td>
-                            <td>
-                                @if (b.IsPaid)
-                                {
-                                    <span class="text-success fw-bold">&#10003;</span>
-                                }
-                                else
-                                {
-                                    <span class="text-danger">&#10007;</span>
-                                }
-                            </td>
-                            <td>
-                                @if (!b.IsPaid)
-                                {
-                                    <button class="btn btn-sm btn-outline-success" @onclick="() => MarkPaid(b.Id)" disabled="@_paying.Contains(b.Id)">
-                                        @(_paying.Contains(b.Id) ? "..." : "Segna pagata")
-                                    </button>
-                                }
-                            </td>
-                        </tr>
+                        <text>@context.PeriodFrom.Value.ToString("MMM yyyy") &ndash; @context.PeriodTo.Value.ToString("MMM yyyy")</text>
                     }
-                </tbody>
-            </table>
-        </div>
+                    else
+                    {
+                        <text>&mdash;</text>
+                    }
+                </MudTd>
+                <MudTd>
+                    @if (context.IsPaid)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" />
+                    }
+                    else
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" />
+                    }
+                </MudTd>
+                <MudTd>
+                    @if (!context.IsPaid)
+                    {
+                        <MudButton Size="Size.Small"
+                                   Variant="Variant.Outlined"
+                                   Color="Color.Success"
+                                   OnClick="() => MarkPaid(context.Id)"
+                                   Disabled="@_paying.Contains(context.Id)">
+                            @(_paying.Contains(context.Id) ? "..." : "Segna pagata")
+                        </MudButton>
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
     }
 }
 

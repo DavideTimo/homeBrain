@@ -3,40 +3,49 @@
 @inject AuthService Auth
 @inject NavigationManager Nav
 
-<div class="d-flex justify-content-center align-items-center" style="min-height: 100vh; background: #f0f2f5;">
-    <div class="card shadow" style="width: 360px;">
-        <div class="card-body p-4">
-            <div class="text-center mb-4">
-                <h4 class="fw-bold mb-1">Casa Tim&#242;</h4>
-                <small class="text-muted">Accedi per continuare</small>
-            </div>
-
-            @if (_error != null)
-            {
-                <div class="alert alert-danger py-2">@_error</div>
-            }
-
-            <EditForm Model="_model" OnValidSubmit="HandleLogin">
-                <DataAnnotationsValidator />
-                <div class="mb-3">
-                    <label class="form-label">Utente</label>
-                    <InputText class="form-control" @bind-Value="_model.Username" autocomplete="username" />
-                </div>
-                <div class="mb-4">
-                    <label class="form-label">Password</label>
-                    <InputText type="password" class="form-control" @bind-Value="_model.Password" autocomplete="current-password" />
-                </div>
-                <button type="submit" class="btn btn-primary w-100" disabled="@_loading">
-                    @if (_loading)
-                    {
-                        <span class="spinner-border spinner-border-sm me-2"></span>
-                    }
-                    Accedi
-                </button>
-            </EditForm>
-        </div>
-    </div>
-</div>
+<MudGrid Justify="Justify.Center" Style="min-height: 100vh; align-items: center;">
+    <MudItem xs="12" sm="8" md="5" lg="4">
+        <MudCard Elevation="4">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h5" Align="Align.Center">Casa Timò</MudText>
+                    <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">Accedi per continuare</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (_error != null)
+                {
+                    <MudAlert Severity="Severity.Error" Class="mb-3">@_error</MudAlert>
+                }
+                <EditForm Model="_model" OnValidSubmit="HandleLogin">
+                    <DataAnnotationsValidator />
+                    <MudTextField @bind-Value="_model.Username"
+                                  Label="Utente"
+                                  Variant="Variant.Outlined"
+                                  Class="mb-3"
+                                  autocomplete="username" />
+                    <MudTextField @bind-Value="_model.Password"
+                                  Label="Password"
+                                  Variant="Variant.Outlined"
+                                  InputType="InputType.Password"
+                                  Class="mb-4"
+                                  autocomplete="current-password" />
+                    <MudButton ButtonType="ButtonType.Submit"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               FullWidth="true"
+                               Disabled="@_loading">
+                        @if (_loading)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        }
+                        Accedi
+                    </MudButton>
+                </EditForm>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
 
 @code {
     private readonly LoginModel _model = new();

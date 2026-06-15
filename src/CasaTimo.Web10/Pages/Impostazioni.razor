@@ -6,355 +6,301 @@
 
 <PageTitle>Impostazioni — Casa Timò</PageTitle>
 
-<h1 class="mb-2">Impostazioni</h1>
-<p class="text-muted mb-4">Le modifiche ai connettori richiedono il riavvio del servizio Workers per essere applicate.</p>
+<MudText Typo="Typo.h4" GutterBottom="true">Impostazioni</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">Le modifiche ai connettori richiedono il riavvio del servizio Workers per essere applicate.</MudText>
 
 <!-- Push notifications card -->
-<div class="card mb-4">
-    <div class="card-header fw-semibold">
-        <i class="bi bi-bell me-2"></i> Notifiche Push
-    </div>
-    <div class="card-body">
+<MudCard Class="mb-4">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudStack Row="true" AlignItems="AlignItems.Center">
+                <MudIcon Icon="@Icons.Material.Filled.Notifications" />
+                <MudText Typo="Typo.h6">Notifiche Push</MudText>
+            </MudStack>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
         @if (!_pushSupported)
         {
-            <p class="text-muted mb-0">Le notifiche push non sono supportate da questo browser.</p>
+            <MudText Color="Color.Secondary">Le notifiche push non sono supportate da questo browser.</MudText>
         }
         else if (_pushSubscribed)
         {
-            <div class="d-flex align-items-center gap-3">
-                <span class="text-success"><i class="bi bi-check-circle me-1"></i> Notifiche attive su questo dispositivo</span>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="DisableNotifications">Disabilita</button>
-                <button class="btn btn-sm btn-outline-primary" @onclick="SendTestNotification">Invia test</button>
-            </div>
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                <MudText Color="Color.Success"><MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Class="mr-1" />Notifiche attive su questo dispositivo</MudText>
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="DisableNotifications">Disabilita</MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" OnClick="SendTestNotification">Invia test</MudButton>
+            </MudStack>
         }
         else
         {
-            <div class="d-flex align-items-center gap-3">
-                <span class="text-muted">Ricevi notifiche push per le scadenze bollette.</span>
-                <button class="btn btn-sm btn-primary" @onclick="EnableNotifications" disabled="@_pushLoading">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                <MudText Color="Color.Secondary">Ricevi notifiche push per le scadenze bollette.</MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" OnClick="EnableNotifications" Disabled="@_pushLoading">
                     @(_pushLoading ? "..." : "Abilita notifiche")
-                </button>
-            </div>
+                </MudButton>
+            </MudStack>
         }
         @if (_pushMessage != null)
         {
-            <div class="mt-2 small @(_pushError ? "text-danger" : "text-success")">@_pushMessage</div>
+            <MudAlert Severity="@(_pushError ? Severity.Error : Severity.Success)" Class="mt-2">@_pushMessage</MudAlert>
         }
-    </div>
-</div>
+    </MudCardContent>
+</MudCard>
 
 @if (_loading)
 {
-    <div class="alert alert-info">Caricamento...</div>
+    <MudAlert Severity="Severity.Info">Caricamento...</MudAlert>
 }
 else
 {
-    <div class="accordion" id="settingsAccordion">
+    <MudExpansionPanels>
 
         <!-- Viessmann -->
-        <div class="accordion-item">
-            <h2 class="accordion-header" id="headingViessmann">
-                <button class="accordion-button collapsed" type="button"
-                        data-bs-toggle="collapse" data-bs-target="#collapseViessmann"
-                        aria-expanded="false" aria-controls="collapseViessmann">
-                    <span class="fw-semibold">Viessmann (PDC + VMC)</span>
+        <MudExpansionPanel>
+            <TitleContent>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.subtitle1"><strong>Viessmann (PDC + VMC)</strong></MudText>
                     @if (_viessmannUpdatedAt.HasValue)
                     {
-                        <span class="ms-auto me-3 small text-muted">Aggiornato: @_viessmannUpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Aggiornato: @_viessmannUpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</MudText>
                     }
-                </button>
-            </h2>
-            <div id="collapseViessmann" class="accordion-collapse collapse"
-                 aria-labelledby="headingViessmann" data-bs-parent="#settingsAccordion">
-                <div class="accordion-body">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">API Base URL</label>
-                            <input class="form-control" @bind="_viessmann.ApiBaseUrl" placeholder="https://api.viessmann.com" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Token Endpoint</label>
-                            <input class="form-control" @bind="_viessmann.TokenEndpoint" placeholder="https://iam.viessmann.com/idp/v3/token" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Client ID</label>
-                            <input class="form-control" @bind="_viessmann.ClientId" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Client Secret</label>
-                            <input class="form-control" type="password" autocomplete="off" @bind="_viessmann.ClientSecret" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Installation ID <span class="text-muted">(opzionale)</span></label>
-                            <input class="form-control" @bind="_viessmann.InstallationId" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Gateway Serial <span class="text-muted">(opzionale)</span></label>
-                            <input class="form-control" @bind="_viessmann.GatewaySerial" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Intervallo di polling</label>
-                            <select class="form-select" @bind="_viessmannPollMinutes">
-                                <option value="60">1 min</option>
-                                <option value="300">5 min</option>
-                                <option value="600">10 min</option>
-                                <option value="900">15 min</option>
-                                <option value="1800">30 min</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="mt-3 d-flex align-items-center gap-3">
-                        <button class="btn btn-primary" @onclick="SaveViessmann" disabled="@_viessmannSaving">
-                            @if (_viessmannSaving)
+                </MudStack>
+            </TitleContent>
+            <ChildContent>
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_viessmann.ApiBaseUrl" Label="API Base URL" Variant="Variant.Outlined" Placeholder="https://api.viessmann.com" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_viessmann.TokenEndpoint" Label="Token Endpoint" Variant="Variant.Outlined" Placeholder="https://iam.viessmann.com/idp/v3/token" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_viessmann.ClientId" Label="Client ID" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_viessmann.ClientSecret" Label="Client Secret" Variant="Variant.Outlined" InputType="InputType.Password" autocomplete="off" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_viessmann.InstallationId" Label="Installation ID (opzionale)" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_viessmann.GatewaySerial" Label="Gateway Serial (opzionale)" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="int" @bind-Value="_viessmannPollMinutes" Label="Intervallo di polling" Variant="Variant.Outlined">
+                            <MudSelectItem T="int" Value="60">1 min</MudSelectItem>
+                            <MudSelectItem T="int" Value="300">5 min</MudSelectItem>
+                            <MudSelectItem T="int" Value="600">10 min</MudSelectItem>
+                            <MudSelectItem T="int" Value="900">15 min</MudSelectItem>
+                            <MudSelectItem T="int" Value="1800">30 min</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveViessmann" Disabled="@_viessmannSaving">
+                                @if (_viessmannSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                                Salva
+                            </MudButton>
+                            @if (_viessmannMsg != null)
                             {
-                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                <MudText Color="@(_viessmannError ? Color.Error : Color.Success)" Typo="Typo.body2">@_viessmannMsg</MudText>
                             }
-                            Salva
-                        </button>
-                        @if (_viessmannMsg != null)
-                        {
-                            <span class="@(_viessmannError ? "text-danger" : "text-success") small">@_viessmannMsg</span>
-                        }
-                    </div>
-                </div>
-            </div>
-        </div>
+                        </MudStack>
+                    </MudItem>
+                </MudGrid>
+            </ChildContent>
+        </MudExpansionPanel>
 
         <!-- Huawei FusionSolar -->
-        <div class="accordion-item">
-            <h2 class="accordion-header" id="headingHuawei">
-                <button class="accordion-button collapsed" type="button"
-                        data-bs-toggle="collapse" data-bs-target="#collapseHuawei"
-                        aria-expanded="false" aria-controls="collapseHuawei">
-                    <span class="fw-semibold">Huawei FusionSolar</span>
+        <MudExpansionPanel>
+            <TitleContent>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.subtitle1"><strong>Huawei FusionSolar</strong></MudText>
                     @if (_huaweiUpdatedAt.HasValue)
                     {
-                        <span class="ms-auto me-3 small text-muted">Aggiornato: @_huaweiUpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Aggiornato: @_huaweiUpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</MudText>
                     }
-                </button>
-            </h2>
-            <div id="collapseHuawei" class="accordion-collapse collapse"
-                 aria-labelledby="headingHuawei" data-bs-parent="#settingsAccordion">
-                <div class="accordion-body">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Base URL</label>
-                            <input class="form-control" @bind="_huawei.BaseUrl" placeholder="https://uni005eu5.fusionsolar.huawei.com" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Username</label>
-                            <input class="form-control" @bind="_huawei.UserName" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">System Code</label>
-                            <input class="form-control" type="password" autocomplete="off" @bind="_huawei.SystemCode" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Station Code <span class="text-muted">(opzionale)</span></label>
-                            <input class="form-control" @bind="_huawei.StationCode" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Intervallo di polling</label>
-                            <select class="form-select" @bind="_huaweiPollMinutes">
-                                <option value="60">1 min</option>
-                                <option value="300">5 min</option>
-                                <option value="600">10 min</option>
-                                <option value="900">15 min</option>
-                                <option value="1800">30 min</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="mt-3 d-flex align-items-center gap-3">
-                        <button class="btn btn-primary" @onclick="SaveHuawei" disabled="@_huaweiSaving">
-                            @if (_huaweiSaving)
+                </MudStack>
+            </TitleContent>
+            <ChildContent>
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_huawei.BaseUrl" Label="Base URL" Variant="Variant.Outlined" Placeholder="https://uni005eu5.fusionsolar.huawei.com" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_huawei.UserName" Label="Username" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_huawei.SystemCode" Label="System Code" Variant="Variant.Outlined" InputType="InputType.Password" autocomplete="off" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_huawei.StationCode" Label="Station Code (opzionale)" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="int" @bind-Value="_huaweiPollMinutes" Label="Intervallo di polling" Variant="Variant.Outlined">
+                            <MudSelectItem T="int" Value="60">1 min</MudSelectItem>
+                            <MudSelectItem T="int" Value="300">5 min</MudSelectItem>
+                            <MudSelectItem T="int" Value="600">10 min</MudSelectItem>
+                            <MudSelectItem T="int" Value="900">15 min</MudSelectItem>
+                            <MudSelectItem T="int" Value="1800">30 min</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveHuawei" Disabled="@_huaweiSaving">
+                                @if (_huaweiSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                                Salva
+                            </MudButton>
+                            @if (_huaweiMsg != null)
                             {
-                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                <MudText Color="@(_huaweiError ? Color.Error : Color.Success)" Typo="Typo.body2">@_huaweiMsg</MudText>
                             }
-                            Salva
-                        </button>
-                        @if (_huaweiMsg != null)
-                        {
-                            <span class="@(_huaweiError ? "text-danger" : "text-success") small">@_huaweiMsg</span>
-                        }
-                    </div>
-                </div>
-            </div>
-        </div>
+                        </MudStack>
+                    </MudItem>
+                </MudGrid>
+            </ChildContent>
+        </MudExpansionPanel>
 
         <!-- Daikin Cloud -->
-        <div class="accordion-item">
-            <h2 class="accordion-header" id="headingDaikin">
-                <button class="accordion-button collapsed" type="button"
-                        data-bs-toggle="collapse" data-bs-target="#collapseDaikin"
-                        aria-expanded="false" aria-controls="collapseDaikin">
-                    <span class="fw-semibold">Daikin Cloud</span>
+        <MudExpansionPanel>
+            <TitleContent>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.subtitle1"><strong>Daikin Cloud</strong></MudText>
                     @if (_daikinUpdatedAt.HasValue)
                     {
-                        <span class="ms-auto me-3 small text-muted">Aggiornato: @_daikinUpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Aggiornato: @_daikinUpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</MudText>
                     }
-                </button>
-            </h2>
-            <div id="collapseDaikin" class="accordion-collapse collapse"
-                 aria-labelledby="headingDaikin" data-bs-parent="#settingsAccordion">
-                <div class="accordion-body">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Token Endpoint</label>
-                            <input class="form-control" @bind="_daikin.TokenEndpoint" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">API Base URL</label>
-                            <input class="form-control" @bind="_daikin.ApiBaseUrl" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Client ID</label>
-                            <input class="form-control" @bind="_daikin.ClientId" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Username</label>
-                            <input class="form-control" @bind="_daikin.Username" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Password</label>
-                            <input class="form-control" type="password" autocomplete="off" @bind="_daikin.Password" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Intervallo di polling</label>
-                            <select class="form-select" @bind="_daikinPollMinutes">
-                                <option value="60">1 min</option>
-                                <option value="300">5 min</option>
-                                <option value="600">10 min</option>
-                                <option value="900">15 min</option>
-                                <option value="1800">30 min</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="mt-3 d-flex align-items-center gap-3">
-                        <button class="btn btn-primary" @onclick="SaveDaikin" disabled="@_daikinSaving">
-                            @if (_daikinSaving)
+                </MudStack>
+            </TitleContent>
+            <ChildContent>
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_daikin.TokenEndpoint" Label="Token Endpoint" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_daikin.ApiBaseUrl" Label="API Base URL" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_daikin.ClientId" Label="Client ID" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_daikin.Username" Label="Username" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_daikin.Password" Label="Password" Variant="Variant.Outlined" InputType="InputType.Password" autocomplete="off" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="int" @bind-Value="_daikinPollMinutes" Label="Intervallo di polling" Variant="Variant.Outlined">
+                            <MudSelectItem T="int" Value="60">1 min</MudSelectItem>
+                            <MudSelectItem T="int" Value="300">5 min</MudSelectItem>
+                            <MudSelectItem T="int" Value="600">10 min</MudSelectItem>
+                            <MudSelectItem T="int" Value="900">15 min</MudSelectItem>
+                            <MudSelectItem T="int" Value="1800">30 min</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveDaikin" Disabled="@_daikinSaving">
+                                @if (_daikinSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                                Salva
+                            </MudButton>
+                            @if (_daikinMsg != null)
                             {
-                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                <MudText Color="@(_daikinError ? Color.Error : Color.Success)" Typo="Typo.body2">@_daikinMsg</MudText>
                             }
-                            Salva
-                        </button>
-                        @if (_daikinMsg != null)
-                        {
-                            <span class="@(_daikinError ? "text-danger" : "text-success") small">@_daikinMsg</span>
-                        }
-                    </div>
-                </div>
-            </div>
-        </div>
+                        </MudStack>
+                    </MudItem>
+                </MudGrid>
+            </ChildContent>
+        </MudExpansionPanel>
 
         <!-- Wallbox OCPP -->
-        <div class="accordion-item">
-            <h2 class="accordion-header" id="headingWallbox">
-                <button class="accordion-button collapsed" type="button"
-                        data-bs-toggle="collapse" data-bs-target="#collapseWallbox"
-                        aria-expanded="false" aria-controls="collapseWallbox">
-                    <span class="fw-semibold">Wallbox OCPP</span>
+        <MudExpansionPanel>
+            <TitleContent>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.subtitle1"><strong>Wallbox OCPP</strong></MudText>
                     @if (_wallboxUpdatedAt.HasValue)
                     {
-                        <span class="ms-auto me-3 small text-muted">Aggiornato: @_wallboxUpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Aggiornato: @_wallboxUpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</MudText>
                     }
-                </button>
-            </h2>
-            <div id="collapseWallbox" class="accordion-collapse collapse"
-                 aria-labelledby="headingWallbox" data-bs-parent="#settingsAccordion">
-                <div class="accordion-body">
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label">Porta</label>
-                            <input class="form-control" type="number" @bind="_wallbox.Port" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Auth Key <span class="text-muted">(opzionale)</span></label>
-                            <input class="form-control" type="password" autocomplete="off" @bind="_wallbox.AuthKey" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Heartbeat Timeout (secondi)</label>
-                            <input class="form-control" type="number" @bind="_wallbox.HeartbeatTimeoutSeconds" />
-                        </div>
-                    </div>
-                    <div class="mt-3 d-flex align-items-center gap-3">
-                        <button class="btn btn-primary" @onclick="SaveWallbox" disabled="@_wallboxSaving">
-                            @if (_wallboxSaving)
+                </MudStack>
+            </TitleContent>
+            <ChildContent>
+                <MudGrid>
+                    <MudItem xs="12" md="4">
+                        <MudNumericField T="int" @bind-Value="_wallbox.Port" Label="Porta" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudTextField @bind-Value="_wallbox.AuthKey" Label="Auth Key (opzionale)" Variant="Variant.Outlined" InputType="InputType.Password" autocomplete="off" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudNumericField T="int" @bind-Value="_wallbox.HeartbeatTimeoutSeconds" Label="Heartbeat Timeout (secondi)" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveWallbox" Disabled="@_wallboxSaving">
+                                @if (_wallboxSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                                Salva
+                            </MudButton>
+                            @if (_wallboxMsg != null)
                             {
-                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                <MudText Color="@(_wallboxError ? Color.Error : Color.Success)" Typo="Typo.body2">@_wallboxMsg</MudText>
                             }
-                            Salva
-                        </button>
-                        @if (_wallboxMsg != null)
-                        {
-                            <span class="@(_wallboxError ? "text-danger" : "text-success") small">@_wallboxMsg</span>
-                        }
-                    </div>
-                </div>
-            </div>
-        </div>
+                        </MudStack>
+                    </MudItem>
+                </MudGrid>
+            </ChildContent>
+        </MudExpansionPanel>
 
         <!-- MQTT Broker -->
-        <div class="accordion-item">
-            <h2 class="accordion-header" id="headingMqtt">
-                <button class="accordion-button collapsed" type="button"
-                        data-bs-toggle="collapse" data-bs-target="#collapseMqtt"
-                        aria-expanded="false" aria-controls="collapseMqtt">
-                    <span class="fw-semibold">MQTT Broker</span>
+        <MudExpansionPanel>
+            <TitleContent>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.subtitle1"><strong>MQTT Broker</strong></MudText>
                     @if (_mqttUpdatedAt.HasValue)
                     {
-                        <span class="ms-auto me-3 small text-muted">Aggiornato: @_mqttUpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Aggiornato: @_mqttUpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</MudText>
                     }
-                </button>
-            </h2>
-            <div id="collapseMqtt" class="accordion-collapse collapse"
-                 aria-labelledby="headingMqtt" data-bs-parent="#settingsAccordion">
-                <div class="accordion-body">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Host</label>
-                            <input class="form-control" @bind="_mqtt.Host" placeholder="localhost" />
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Porta</label>
-                            <input class="form-control" type="number" @bind="_mqtt.Port" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Client ID</label>
-                            <input class="form-control" @bind="_mqtt.ClientId" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Username <span class="text-muted">(opzionale)</span></label>
-                            <input class="form-control" @bind="_mqtt.Username" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Password <span class="text-muted">(opzionale)</span></label>
-                            <input class="form-control" type="password" autocomplete="off" @bind="_mqtt.Password" />
-                        </div>
-                        <div class="col-12">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="mqttUseTls" @bind="_mqtt.UseTls" />
-                                <label class="form-check-label" for="mqttUseTls">Usa TLS</label>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mt-3 d-flex align-items-center gap-3">
-                        <button class="btn btn-primary" @onclick="SaveMqtt" disabled="@_mqttSaving">
-                            @if (_mqttSaving)
+                </MudStack>
+            </TitleContent>
+            <ChildContent>
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_mqtt.Host" Label="Host" Variant="Variant.Outlined" Placeholder="localhost" />
+                    </MudItem>
+                    <MudItem xs="12" md="3">
+                        <MudNumericField T="int" @bind-Value="_mqtt.Port" Label="Porta" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_mqtt.ClientId" Label="Client ID" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_mqtt.Username" Label="Username (opzionale)" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_mqtt.Password" Label="Password (opzionale)" Variant="Variant.Outlined" InputType="InputType.Password" autocomplete="off" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudCheckBox @bind-Value="_mqtt.UseTls" Label="Usa TLS" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveMqtt" Disabled="@_mqttSaving">
+                                @if (_mqttSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                                Salva
+                            </MudButton>
+                            @if (_mqttMsg != null)
                             {
-                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                <MudText Color="@(_mqttError ? Color.Error : Color.Success)" Typo="Typo.body2">@_mqttMsg</MudText>
                             }
-                            Salva
-                        </button>
-                        @if (_mqttMsg != null)
-                        {
-                            <span class="@(_mqttError ? "text-danger" : "text-success") small">@_mqttMsg</span>
-                        }
-                    </div>
-                </div>
-            </div>
-        </div>
+                        </MudStack>
+                    </MudItem>
+                </MudGrid>
+            </ChildContent>
+        </MudExpansionPanel>
 
-    </div>
+    </MudExpansionPanels>
 }
 
 @code {

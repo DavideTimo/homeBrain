@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using CasaTimo.Web10.Services;
+using MudBlazor.Services;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<CasaTimo.Web10.App>("#app");
@@ -23,5 +24,8 @@ builder.Services.AddAuthorizationCore();
 // API client
 builder.Services.AddScoped<ApiClient>();
 builder.Services.AddScoped<NotificationService>();
+
+// MudBlazor
+builder.Services.AddMudServices();
 
 await builder.Build().RunAsync();

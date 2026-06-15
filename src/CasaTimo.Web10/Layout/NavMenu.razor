@@ -1,39 +1,6 @@
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand fw-bold" href="">🏠 Casa Timò</a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-    </div>
-</div>
-
-<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <i class="bi bi-speedometer2 me-2"></i> Dashboard
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="bollette">
-                <i class="bi bi-receipt me-2"></i> Bollette
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="manutenzione">
-                <i class="bi bi-tools me-2"></i> Manutenzioni
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="impostazioni">
-                <i class="bi bi-gear me-2"></i> Impostazioni
-            </NavLink>
-        </div>
-    </nav>
-</div>
-
-@code {
-    private bool collapseNavMenu = true;
-    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
-    private void ToggleNavMenu() => collapseNavMenu = !collapseNavMenu;
-}
+<MudNavMenu>
+    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+    <MudNavLink Href="bollette" Icon="@Icons.Material.Filled.Receipt">Bollette</MudNavLink>
+    <MudNavLink Href="manutenzione" Icon="@Icons.Material.Filled.Build">Manutenzioni</MudNavLink>
+    <MudNavLink Href="impostazioni" Icon="@Icons.Material.Filled.Settings">Impostazioni</MudNavLink>
+</MudNavMenu>

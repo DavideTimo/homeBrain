@@ -3,113 +3,103 @@
 @inject ApiClient Api
 @implements IDisposable
 
-<PageTitle>Dashboard &mdash; Casa Tim&#242;</PageTitle>
+<PageTitle>Dashboard &mdash; Casa Timò</PageTitle>
 
-<h1 class="mb-4">Dashboard &mdash; Casa Tim&#242;</h1>
+<MudText Typo="Typo.h4" GutterBottom="true">Dashboard &mdash; Casa Timò</MudText>
 
-<section class="mb-5">
-    <div class="d-flex align-items-center mb-3">
-        <h2 class="mb-0 me-3">Sensori Live</h2>
-        <small class="text-muted">Aggiornamento automatico ogni 30s</small>
-    </div>
+<MudText Typo="Typo.h5" Class="mb-2">Sensori Live</MudText>
+<MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3">Aggiornamento automatico ogni 30s</MudText>
 
-    @if (_sensorsLoading)
-    {
-        <div class="alert alert-info">Caricamento sensori...</div>
-    }
-    else if (_sensorsError != null)
-    {
-        <div class="alert alert-danger">
-            <strong>Errore API:</strong> @_sensorsError
-        </div>
-    }
-    else if (_sensorGroups == null || _sensorGroups.Count == 0)
-    {
-        <div class="alert alert-secondary">Nessun dato sensore disponibile.</div>
-    }
-    else
-    {
-        <div class="row g-3">
-            @foreach (var group in _sensorGroups)
-            {
-                <div class="col-12 col-md-6 col-xl-4">
-                    <div class="card h-100">
-                        <div class="card-header fw-semibold">
-                            @DeviceLabel(group.Key)
-                        </div>
-                        <div class="card-body p-0">
-                            <table class="table table-sm mb-0">
-                                <thead class="table-light">
+@if (_sensorsLoading)
+{
+    <MudAlert Severity="Severity.Info" Class="mb-4">Caricamento sensori...</MudAlert>
+}
+else if (_sensorsError != null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4"><strong>Errore API:</strong> @_sensorsError</MudAlert>
+}
+else if (_sensorGroups == null || _sensorGroups.Count == 0)
+{
+    <MudAlert Severity="Severity.Normal" Class="mb-4">Nessun dato sensore disponibile.</MudAlert>
+}
+else
+{
+    <MudGrid Class="mb-5">
+        @foreach (var group in _sensorGroups)
+        {
+            <MudItem xs="12" md="6" xl="4">
+                <MudCard Height="100%">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">@DeviceLabel(group.Key)</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent Class="pa-0">
+                        <MudSimpleTable Dense="true" Striped="true">
+                            <thead>
+                                <tr>
+                                    <th>Metrica</th>
+                                    <th>Valore</th>
+                                    <th>Unità</th>
+                                    <th>Timestamp</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var r in group.Value)
+                                {
                                     <tr>
-                                        <th>Metrica</th>
-                                        <th>Valore</th>
-                                        <th>Unit&#224;</th>
-                                        <th>Timestamp</th>
+                                        <td>@MetricLabel(r.Metric)</td>
+                                        <td><strong>@r.Value.ToString("G4")</strong></td>
+                                        <td>@(r.Unit ?? "—")</td>
+                                        <td><MudText Typo="Typo.caption" Color="Color.Secondary">@r.Timestamp.ToLocalTime().ToString("HH:mm:ss")</MudText></td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var r in group.Value)
-                                    {
-                                        <tr>
-                                            <td>@MetricLabel(r.Metric)</td>
-                                            <td><strong>@r.Value.ToString("G4")</strong></td>
-                                            <td>@(r.Unit ?? "—")</td>
-                                            <td class="text-muted" style="font-size:0.8em">@r.Timestamp.ToLocalTime().ToString("HH:mm:ss")</td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            }
-        </div>
-    }
-</section>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
 
-<section class="mb-5">
-    <h2 class="mb-3">Reminder Attivi</h2>
+<MudText Typo="Typo.h5" Class="mb-3">Reminder Attivi</MudText>
 
-    @if (_remindersLoading)
-    {
-        <div class="alert alert-info">Caricamento reminder...</div>
-    }
-    else if (_remindersError != null)
-    {
-        <div class="alert alert-danger">
-            <strong>Errore API:</strong> @_remindersError
-        </div>
-    }
-    else if (_activeReminders == null || _activeReminders.Count == 0)
-    {
-        <div class="alert alert-success">
-            &#10003; Nessuna scadenza imminente.
-        </div>
-    }
-    else
-    {
-        <div class="row g-3">
-            @foreach (var r in _activeReminders)
-            {
-                var daysLeft = (int)(r.DueDate.Date - DateTime.Today).TotalDays;
-                var alertClass = daysLeft <= 3 ? "alert-danger" : daysLeft <= 7 ? "alert-warning" : "alert-info";
-                <div class="col-12 col-md-6">
-                    <div class="alert @alertClass mb-0">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <strong>@(r.Message ?? $"Reminder bolletta #{r.BillId}")</strong>
-                            <span class="badge bg-dark">
-                                @if (daysLeft == 0) { <text>Oggi</text> }
-                                else if (daysLeft < 0) { <text>Scaduto</text> }
-                                else { <text>tra @daysLeft giorni</text> }
-                            </span>
-                        </div>
-                        <small>Scadenza: @r.DueDate.ToString("dd/MM/yyyy")</small>
-                    </div>
-                </div>
-            }
-        </div>
-    }
-</section>
+@if (_remindersLoading)
+{
+    <MudAlert Severity="Severity.Info" Class="mb-4">Caricamento reminder...</MudAlert>
+}
+else if (_remindersError != null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4"><strong>Errore API:</strong> @_remindersError</MudAlert>
+}
+else if (_activeReminders == null || _activeReminders.Count == 0)
+{
+    <MudAlert Severity="Severity.Success" Class="mb-4">&#10003; Nessuna scadenza imminente.</MudAlert>
+}
+else
+{
+    <MudGrid Class="mb-5">
+        @foreach (var r in _activeReminders)
+        {
+            var daysLeft = (int)(r.DueDate.Date - DateTime.Today).TotalDays;
+            var severity = daysLeft <= 3 ? Severity.Error : daysLeft <= 7 ? Severity.Warning : Severity.Info;
+            <MudItem xs="12" md="6">
+                <MudAlert Severity="@severity" Class="mb-0">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                        <strong>@(r.Message ?? $"Reminder bolletta #{r.BillId}")</strong>
+                        <MudChip T="string" Color="Color.Dark" Size="Size.Small">
+                            @if (daysLeft == 0) { <text>Oggi</text> }
+                            else if (daysLeft < 0) { <text>Scaduto</text> }
+                            else { <text>tra @daysLeft giorni</text> }
+                        </MudChip>
+                    </MudStack>
+                    <MudText Typo="Typo.caption">Scadenza: @r.DueDate.ToString("dd/MM/yyyy")</MudText>
+                </MudAlert>
+            </MudItem>
+        }
+    </MudGrid>
+}
 
 @code {
     private bool _sensorsLoading = true;

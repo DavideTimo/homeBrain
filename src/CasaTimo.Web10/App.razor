@@ -1,3 +1,7 @@
+<MudThemeProvider />
+<MudPopoverProvider />
+<MudSnackbarProvider />
+
 <CascadingAuthenticationState>
     <Router AppAssembly="@typeof(App).Assembly" NotFoundPage="typeof(Pages.NotFound)">
         <Found Context="routeData">
@@ -6,9 +10,7 @@
                     <CasaTimo.Web10.Pages.Login />
                 </NotAuthorized>
                 <Authorizing>
-                    <div class="d-flex justify-content-center align-items-center" style="height:100vh">
-                        <div class="spinner-border text-primary" role="status"></div>
-                    </div>
+                    <MudProgressCircular Indeterminate="true" Style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)" />
                 </Authorizing>
             </AuthorizeRouteView>
             <FocusOnNavigate RouteData="@routeData" Selector="h1" />

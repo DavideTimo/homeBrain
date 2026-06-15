@@ -3,11 +3,14 @@
 
 @if (_updateAvailable)
 {
-    <div class="alert alert-info d-flex justify-content-between align-items-center mb-0 rounded-0 border-0 border-bottom"
-         style="position: sticky; top: 0; z-index: 1050;">
-        <span>&#x1F504; &Egrave; disponibile una nuova versione di Casa Tim&#242;.</span>
-        <button class="btn btn-sm btn-primary ms-3" @onclick="ApplyUpdate">Aggiorna ora</button>
-    </div>
+    <MudAlert Severity="Severity.Info"
+              Style="position: sticky; top: 0; z-index: 1050; border-radius: 0;"
+              Class="mb-0">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+            <span>&#x1F504; &Egrave; disponibile una nuova versione di Casa Tim&#242;.</span>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" OnClick="ApplyUpdate">Aggiorna ora</MudButton>
+        </MudStack>
+    </MudAlert>
 }
 
 @code {
