@@ -36,6 +36,8 @@ services:
   workers:
     image: ghcr.io/davidetimo/homebrain/casatimo-workers:latest
     container_name: casatimo-workers
+    ports:
+      - '9000:9000'   # OCPP 1.6 WebSocket — la wallbox si connette qui
     environment:
       - DOTNET_ENVIRONMENT=Production
       - ApiBaseUrl=http://api:8080

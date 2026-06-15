@@ -183,11 +183,11 @@
 
     private static string DeviceLabel(string deviceId) => deviceId.ToLower() switch
     {
-        "pdc"  => "Pompa di Calore",
-        "fv"   => "Fotovoltaico & Batteria",
-        "vmc"  => "VMC",
-        "daikin" => "Clima Daikin",
-        "wallbox" => "Wallbox",
+        "pdc"     => "🔥 Pompa di Calore",
+        "fv"      => "☀️ Fotovoltaico & Batteria",
+        "vmc"     => "💨 VMC",
+        "daikin"  => "❄️ Clima Daikin",
+        "wallbox" => "⚡ Wallbox",
         _ => deviceId.ToUpperInvariant()
     };
 
@@ -214,6 +214,24 @@
         "inverter/state"          => "Stato inverter",
         "humidity/extract"        => "Umidità ripresa",
         "humidity/supply"         => "Umidità mandata",
+        // Daikin
+        "zone/0/power"            => "Zona 1 — Accensione",
+        "zone/0/mode"             => "Zona 1 — Modalità",
+        "zone/0/temperature/room"     => "Zona 1 — Temp. stanza",
+        "zone/0/temperature/setpoint" => "Zona 1 — Setpoint",
+        "zone/0/fan/speed"        => "Zona 1 — Velocità ventola",
+        "zone/1/power"            => "Zona 2 — Accensione",
+        "zone/1/mode"             => "Zona 2 — Modalità",
+        "zone/1/temperature/room"     => "Zona 2 — Temp. stanza",
+        "zone/1/temperature/setpoint" => "Zona 2 — Setpoint",
+        "zone/2/power"            => "Zona 3 — Accensione",
+        "zone/2/temperature/room"     => "Zona 3 — Temp. stanza",
+        // Wallbox
+        "status"                  => "Stato",
+        "power"                   => "Potenza ricarica",
+        "session/energy"          => "Energia sessione",
+        "session/start"           => "Inizio sessione",
+        "session/stop"            => "Fine sessione",
         _ => metric
     };
 }
