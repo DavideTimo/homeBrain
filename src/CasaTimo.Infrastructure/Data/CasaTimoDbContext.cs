@@ -14,12 +14,39 @@ public class CasaTimoDbContext : DbContext
     public DbSet<Bill> Bills { get; set; }
     public DbSet<Reminder> Reminders { get; set; }
     public DbSet<MaintenanceRecord> MaintenanceRecords { get; set; }
-    public DbSet<CasaTimo.Core.Models.ConnectorConfig> ConnectorConfigs { get; set; }
+    public DbSet<ConnectorConfig> ConnectorConfigs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
         modelBuilder.Entity<Device>().HasKey(d => d.Id);
+
         modelBuilder.Entity<SensorReading>().HasKey(r => r.Id);
+        modelBuilder.Entity<SensorReading>()
+            .HasOne(r => r.Device)
+            .WithMany()
+            .HasForeignKey(r => r.DeviceId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Reminder>()
+            .HasOne(r => r.Bill)
+            .WithMany()
+            .HasForeignKey(r => r.BillId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<MaintenanceRecord>()
+            .HasOne(m => m.Device)
+            .WithMany()
+            .HasForeignKey(m => m.DeviceId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Bill>()
+            .Property(b => b.CreatedAt)
+            .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+        modelBuilder.Entity<ConnectorConfig>()
+            .Property(c => c.UpdatedAt)
+            .HasDefaultValueSql("CURRENT_TIMESTAMP");
     }
 }

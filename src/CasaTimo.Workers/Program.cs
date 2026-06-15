@@ -1,18 +1,17 @@
 using CasaTimo.Workers;
-using Microsoft.Extensions.DependencyInjection;
 using CasaTimo.Infrastructure.Messaging;
 using CasaTimo.Infrastructure.Connectors;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-// Register a typed HttpClient for the Worker with the API base address
-builder.Services.AddHttpClient<Worker>(c => c.BaseAddress = new Uri("http://localhost:5233"));
+builder.Services.AddHttpClient<Worker>(c =>
+    c.BaseAddress = new Uri(builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5233"));
 
-// Configure MQTT options and register the managed MQTT client as a hosted service
-builder.Services.Configure<MqttOptions>(builder.Configuration.GetSection("Mqtt"));
-builder.Services.AddHostedService<MqttClientService>();
+// MqttClientService registered as both IHostedService and IMessageBroker
+builder.Services.AddSingleton<MqttClientService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<MqttClientService>());
+builder.Services.AddSingleton<IMessageBroker>(sp => sp.GetRequiredService<MqttClientService>());
 
-// Viessmann connector (scaffold). Configure section 'Viessmann' in appsettings
 builder.Services.AddHttpClient("viessmann");
 builder.Services.AddHostedService<ViessmannConnector>();
 

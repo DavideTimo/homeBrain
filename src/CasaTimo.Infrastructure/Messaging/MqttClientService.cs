@@ -4,23 +4,22 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MQTTnet;
 using MQTTnet.Client;
-using MQTTnet.Extensions.ManagedClient;
 
 namespace CasaTimo.Infrastructure.Messaging;
 
-public class MqttClientService : IHostedService, IDisposable
+public class MqttClientService : IHostedService, IMessageBroker, IDisposable
 {
     private readonly ILogger<MqttClientService> _logger;
-    private readonly IConfiguration _configuration;
+    private readonly MqttOptions _options;
     private IMqttClient? _client;
-    private MqttOptions _options = new();
+
+    public event Func<string, string, Task>? MessageReceived;
 
     public MqttClientService(IConfiguration configuration, ILogger<MqttClientService> logger)
     {
-        _configuration = configuration;
         _logger = logger;
-        var section = configuration.GetSection("Mqtt");
-        section.Bind(_options);
+        _options = new MqttOptions();
+        configuration.GetSection("Mqtt").Bind(_options);
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -30,47 +29,34 @@ public class MqttClientService : IHostedService, IDisposable
             var factory = new MqttFactory();
             _client = factory.CreateMqttClient();
 
-            // Subscribe to the ApplicationMessageReceivedAsync event if available
-            // which is supported by MQTTnet client implementations.
-            try
+            _client.ApplicationMessageReceivedAsync += async e =>
             {
-                _client.ApplicationMessageReceivedAsync += async e =>
-                {
-                    try
-                    {
-                        var payload = e.ApplicationMessage.Payload == null ? string.Empty : Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
-                        _logger.LogInformation("MQTT msg received: {topic} -> {payload}", e.ApplicationMessage.Topic, payload);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error processing MQTT message");
-                    }
-                    await Task.CompletedTask;
-                };
-            }
-            catch
-            {
-                // If the event is not available on this MQTTnet version, swallow
-                // the exception and continue without a handler so the service can run.
-            }
+                var topic = e.ApplicationMessage.Topic;
+                var payload = e.ApplicationMessage.Payload == null
+                    ? string.Empty
+                    : Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
 
-            var clientOptions = new MqttClientOptionsBuilder()
+                _logger.LogDebug("MQTT received: {topic} -> {payload}", topic, payload);
+
+                if (MessageReceived != null)
+                {
+                    try { await MessageReceived(topic, payload); }
+                    catch (Exception ex) { _logger.LogError(ex, "Error in MessageReceived handler for topic {topic}", topic); }
+                }
+            };
+
+            var optionsBuilder = new MqttClientOptionsBuilder()
                 .WithClientId(_options.ClientId ?? Guid.NewGuid().ToString())
                 .WithTcpServer(_options.Host ?? "localhost", _options.Port);
 
             if (!string.IsNullOrEmpty(_options.Username))
-            {
-                clientOptions = clientOptions.WithCredentials(_options.Username, _options.Password);
-            }
+                optionsBuilder = optionsBuilder.WithCredentials(_options.Username, _options.Password);
 
             if (_options.UseTls)
-            {
-                clientOptions = clientOptions.WithTls();
-            }
+                optionsBuilder = optionsBuilder.WithTlsOptions(o => { });
 
-            var mqttOpts = clientOptions.Build();
-            await _client.ConnectAsync(mqttOpts, cancellationToken);
-            _logger.LogInformation("MQTT client connected against {host}:{port}", _options.Host, _options.Port);
+            await _client.ConnectAsync(optionsBuilder.Build(), cancellationToken);
+            _logger.LogInformation("MQTT connected to {host}:{port}", _options.Host, _options.Port);
         }
         catch (Exception ex)
         {
@@ -80,16 +66,17 @@ public class MqttClientService : IHostedService, IDisposable
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        if (_client != null)
+        if (_client?.IsConnected == true)
         {
-            await _client.DisconnectAsync();
+            await _client.DisconnectAsync(new MqttClientDisconnectOptions(), cancellationToken);
             _logger.LogInformation("MQTT client disconnected");
         }
     }
 
     public async Task PublishAsync(string topic, string payload, CancellationToken cancellationToken = default)
     {
-        if (_client == null) throw new InvalidOperationException("MQTT client not started");
+        if (_client == null || !_client.IsConnected)
+            throw new InvalidOperationException("MQTT client is not connected");
 
         var message = new MqttApplicationMessageBuilder()
             .WithTopic(topic)
@@ -101,17 +88,15 @@ public class MqttClientService : IHostedService, IDisposable
 
     public async Task SubscribeAsync(string topic, CancellationToken cancellationToken = default)
     {
-        if (_client == null) throw new InvalidOperationException("MQTT client not started");
-        await _client.SubscribeAsync(new MqttTopicFilterBuilder().WithTopic(topic).Build());
+        if (_client == null || !_client.IsConnected)
+            throw new InvalidOperationException("MQTT client is not connected");
+
+        await _client.SubscribeAsync(new MqttTopicFilterBuilder().WithTopic(topic).Build(), cancellationToken);
         _logger.LogInformation("Subscribed to MQTT topic {topic}", topic);
     }
 
     public void Dispose()
     {
-        try
-        {
-            _client?.Dispose();
-        }
-        catch { }
+        _client?.Dispose();
     }
 }
