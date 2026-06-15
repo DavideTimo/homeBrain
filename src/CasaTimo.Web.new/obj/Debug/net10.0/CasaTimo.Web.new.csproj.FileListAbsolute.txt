@@ -1,0 +1,11 @@
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web.new\obj\Debug\net10.0\EmbeddedAttribute.cs
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web.new\obj\Debug\net10.0\ValidatableTypeAttribute.cs
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web.new\obj\Debug\net10.0\CasaTimo.Web.new.csproj.AssemblyReference.cache
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web.new\obj\Debug\net10.0\hotreload\Microsoft.DotNet.HotReload.WebAssembly.Browser.lib.module.js
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web.new\obj\Debug\net10.0\rpswa.dswa.cache.json
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web.new\obj\Debug\net10.0\CasaTimo.Web.new.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web.new\obj\Debug\net10.0\CasaTimo.Web.new.AssemblyInfoInputs.cache
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web.new\obj\Debug\net10.0\CasaTimo.Web.new.AssemblyInfo.cs
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web.new\obj\Debug\net10.0\CasaTimo.Web.new.csproj.CoreCompileInputs.cache
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web.new\obj\Debug\net10.0\CasaTimo.Web.new.MvcApplicationPartsAssemblyInfo.cache
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web.new\obj\Debug\net10.0\CasaTimo.Web.new.sourcelink.json

@@ -1,0 +1,48 @@
+{
+  "version": 2,
+  "dgSpecHash": "7tHx7QJ4Ldw=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\david\\OneDrive - MB Engineering srl\\Documenti\\Progetti software\\HomeBrain\\homeBrain\\src\\CasaTimo.Api\\CasaTimo.Api.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\david\\.nuget\\packages\\microsoft.data.sqlite.core\\8.0.0\\microsoft.data.sqlite.core.8.0.0.nupkg.sha512",
+    "C:\\Users\\david\\.nuget\\packages\\microsoft.entityframeworkcore\\8.0.0\\microsoft.entityframeworkcore.8.0.0.nupkg.sha512",
+    "C:\\Users\\david\\.nuget\\packages\\microsoft.entityframeworkcore.abstractions\\8.0.0\\microsoft.entityframeworkcore.abstractions.8.0.0.nupkg.sha512",
+    "C:\\Users\\david\\.nuget\\packages\\microsoft.entityframeworkcore.analyzers\\8.0.0\\microsoft.entityframeworkcore.analyzers.8.0.0.nupkg.sha512",
+    "C:\\Users\\david\\.nuget\\packages\\microsoft.entityframeworkcore.relational\\8.0.0\\microsoft.entityframeworkcore.relational.8.0.0.nupkg.sha512",
+    "C:\\Users\\david\\.nuget\\packages\\microsoft.entityframeworkcore.sqlite\\8.0.0\\microsoft.entityframeworkcore.sqlite.8.0.0.nupkg.sha512",
+    "C:\\Users\\david\\.nuget\\packages\\microsoft.entityframeworkcore.sqlite.core\\8.0.0\\microsoft.entityframeworkcore.sqlite.core.8.0.0.nupkg.sha512",
+    "C:\\Users\\david\\.nuget\\packages\\microsoft.extensions.dependencymodel\\8.0.0\\microsoft.extensions.dependencymodel.8.0.0.nupkg.sha512",
+    "C:\\Users\\david\\.nuget\\packages\\mqttnet\\4.0.0.167\\mqttnet.4.0.0.167.nupkg.sha512",
+    "C:\\Users\\david\\.nuget\\packages\\mqttnet.extensions.managedclient\\4.0.0.167\\mqttnet.extensions.managedclient.4.0.0.167.nupkg.sha512",
+    "C:\\Users\\david\\.nuget\\packages\\sqlitepclraw.bundle_e_sqlite3\\2.1.6\\sqlitepclraw.bundle_e_sqlite3.2.1.6.nupkg.sha512",
+    "C:\\Users\\david\\.nuget\\packages\\sqlitepclraw.core\\2.1.6\\sqlitepclraw.core.2.1.6.nupkg.sha512",
+    "C:\\Users\\david\\.nuget\\packages\\sqlitepclraw.lib.e_sqlite3\\2.1.6\\sqlitepclraw.lib.e_sqlite3.2.1.6.nupkg.sha512",
+    "C:\\Users\\david\\.nuget\\packages\\sqlitepclraw.provider.e_sqlite3\\2.1.6\\sqlitepclraw.provider.e_sqlite3.2.1.6.nupkg.sha512"
+  ],
+  "logs": [
+    {
+      "code": "NU1603",
+      "level": "Warning",
+      "message": "CasaTimo.Infrastructure dipende da MQTTnet (>= 4.0.0), ma MQTTnet 4.0.0 non è stato trovato. MQTTnet 4.0.0.167 è stato risolto.",
+      "projectPath": "C:\\Users\\david\\OneDrive - MB Engineering srl\\Documenti\\Progetti software\\HomeBrain\\homeBrain\\src\\CasaTimo.Api\\CasaTimo.Api.csproj",
+      "warningLevel": 1,
+      "filePath": "C:\\Users\\david\\OneDrive - MB Engineering srl\\Documenti\\Progetti software\\HomeBrain\\homeBrain\\src\\CasaTimo.Api\\CasaTimo.Api.csproj",
+      "libraryId": "MQTTnet",
+      "targetGraphs": [
+        "net10.0"
+      ]
+    },
+    {
+      "code": "NU1603",
+      "level": "Warning",
+      "message": "CasaTimo.Infrastructure dipende da MQTTnet.Extensions.ManagedClient (>= 4.0.0), ma MQTTnet.Extensions.ManagedClient 4.0.0 non è stato trovato. MQTTnet.Extensions.ManagedClient 4.0.0.167 è stato risolto.",
+      "projectPath": "C:\\Users\\david\\OneDrive - MB Engineering srl\\Documenti\\Progetti software\\HomeBrain\\homeBrain\\src\\CasaTimo.Api\\CasaTimo.Api.csproj",
+      "warningLevel": 1,
+      "filePath": "C:\\Users\\david\\OneDrive - MB Engineering srl\\Documenti\\Progetti software\\HomeBrain\\homeBrain\\src\\CasaTimo.Api\\CasaTimo.Api.csproj",
+      "libraryId": "MQTTnet.Extensions.ManagedClient",
+      "targetGraphs": [
+        "net10.0"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,114 @@
+@page "/connectors"
+
+@inject HttpClient Http
+
+<PageTitle>Connectors</PageTitle>
+
+<h3>Connectors (Admin)</h3>
+
+<div class="mb-3">
+    <label class="form-label">Admin password</label>
+    <input class="form-control" @bind="AdminPassword" type="password" />
+    <button class="btn btn-primary mt-2" @onclick="LoadConnectors">Load Connectors</button>
+</div>
+
+@if (ConnectorList is null)
+{
+    <p>No connectors loaded.</p>
+}
+else
+{
+    <div class="row">
+        <div class="col-4">
+            <ul class="list-group">
+                @foreach (var c in ConnectorList)
+                {
+                    <li class="list-group-item" @onclick="() => SelectConnector(c.ConnectorName)">
+                        @c.ConnectorName
+                    </li>
+                }
+            </ul>
+        </div>
+        <div class="col-8">
+            @if (Selected is not null)
+            {
+                <h5>@Selected.ConnectorName</h5>
+                <label>Settings JSON</label>
+                <textarea class="form-control" style="height:300px" @bind="Selected.SettingsJson"></textarea>
+                <button class="btn btn-success mt-2" @onclick="SaveSelected">Save</button>
+            }
+            else
+            {
+                <p>Select a connector to view/edit settings.</p>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private string AdminPassword { get; set; } = string.Empty;
+    private List<ConnectorDto>? ConnectorList { get; set; }
+    private ConnectorDto? Selected { get; set; }
+
+    private async Task LoadConnectors()
+    {
+        try
+        {
+            var req = new HttpRequestMessage(HttpMethod.Get, "http://localhost:5233/api/connectors");
+            var resp = await Http.SendAsync(req);
+            if (!resp.IsSuccessStatusCode) return;
+            ConnectorList = await resp.Content.ReadFromJsonAsync<List<ConnectorDto>>();
+            Selected = ConnectorList?.FirstOrDefault();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private async Task SelectConnector(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return;
+        try
+        {
+            var req = new HttpRequestMessage(HttpMethod.Get, $"http://localhost:5233/api/connectors/{name}");
+            var resp = await Http.SendAsync(req);
+            if (!resp.IsSuccessStatusCode) return;
+            Selected = await resp.Content.ReadFromJsonAsync<ConnectorDto>();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private async Task SaveSelected()
+    {
+        if (Selected == null) return;
+        try
+        {
+            var req = new HttpRequestMessage(HttpMethod.Put, $"http://localhost:5233/api/connectors/{Selected.ConnectorName}");
+            req.Headers.Add("X-Admin-Password", AdminPassword);
+            req.Content = new StringContent(Selected.SettingsJson ?? string.Empty, System.Text.Encoding.UTF8, "application/json");
+            var resp = await Http.SendAsync(req);
+            if (resp.IsSuccessStatusCode)
+            {
+                await LoadConnectors();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private class ConnectorDto
+    {
+        public int Id { get; set; }
+        public string ConnectorName { get; set; } = string.Empty;
+        public string? SettingsJson { get; set; }
+        public DateTime UpdatedAt { get; set; }
+    }
+}

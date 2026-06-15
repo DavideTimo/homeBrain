@@ -1,0 +1,12 @@
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Infrastructure\bin\Debug\net8.0\CasaTimo.Infrastructure.deps.json
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Infrastructure\bin\Debug\net8.0\CasaTimo.Infrastructure.dll
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Infrastructure\bin\Debug\net8.0\CasaTimo.Infrastructure.pdb
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Infrastructure\obj\Debug\net8.0\CasaTimo.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Infrastructure\obj\Debug\net8.0\CasaTimo.Infrastructure.AssemblyInfoInputs.cache
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Infrastructure\obj\Debug\net8.0\CasaTimo.Infrastructure.AssemblyInfo.cs
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Infrastructure\obj\Debug\net8.0\CasaTimo.Infrastructure.csproj.CoreCompileInputs.cache
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Infrastructure\obj\Debug\net8.0\CasaTimo.Infrastructure.sourcelink.json
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Infrastructure\obj\Debug\net8.0\CasaTimo.Infrastructure.dll
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Infrastructure\obj\Debug\net8.0\refint\CasaTimo.Infrastructure.dll
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Infrastructure\obj\Debug\net8.0\CasaTimo.Infrastructure.pdb
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Infrastructure\obj\Debug\net8.0\ref\CasaTimo.Infrastructure.dll
