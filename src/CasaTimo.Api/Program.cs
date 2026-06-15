@@ -1,13 +1,44 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using CasaTimo.Infrastructure.Data;
 using CasaTimo.Core.Models;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ── Database ──────────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<CasaTimoDbContext>(opts =>
     opts.UseSqlite(builder.Configuration.GetConnectionString("CasaTimoDb") ?? "Data Source=casatimo.db")
 );
 
+// ── JWT Authentication ────────────────────────────────────────────────────────
+var jwtKey = builder.Configuration["Jwt:Key"]
+    ?? throw new InvalidOperationException("Jwt:Key is required. Set it via environment variable or user-secrets.");
+var jwtIssuer   = builder.Configuration["Jwt:Issuer"]   ?? "casatimo";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "casatimo";
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(opts =>
+    {
+        opts.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer           = true,
+            ValidateAudience         = true,
+            ValidateLifetime         = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer              = jwtIssuer,
+            ValidAudience            = jwtAudience,
+            IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            ClockSkew                = TimeSpan.FromMinutes(1)
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+// ── CORS ──────────────────────────────────────────────────────────────────────
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(p =>
@@ -23,6 +54,7 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// ── DB Migration ──────────────────────────────────────────────────────────────
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<CasaTimoDbContext>();
@@ -30,27 +62,49 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
 
+// ── Public endpoints ──────────────────────────────────────────────────────────
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy", uptime = DateTime.UtcNow }));
-app.MapGet("/", () => Results.Ok(new { message = "CasaTimo API is running", version = "0.1.0" }));
 
-app.MapGet("/api/connectors", async (CasaTimoDbContext db) =>
+app.MapPost("/auth/login", (LoginRequest req, IConfiguration config) =>
+{
+    var username = config["Auth:Username"] ?? string.Empty;
+    var password = config["Auth:Password"] ?? string.Empty;
+
+    if (string.IsNullOrEmpty(username) || req.Username != username || req.Password != password)
+        return Results.Unauthorized();
+
+    var expiryDays = config.GetValue<int>("Jwt:ExpiryDays", 30);
+    var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
+        config["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key missing")));
+    var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+    var token = new JwtSecurityToken(
+        issuer:   config["Jwt:Issuer"]   ?? "casatimo",
+        audience: config["Jwt:Audience"] ?? "casatimo",
+        claims:   [new Claim(ClaimTypes.Name, req.Username)],
+        expires:  DateTime.UtcNow.AddDays(expiryDays),
+        signingCredentials: creds);
+
+    return Results.Ok(new { token = new JwtSecurityTokenHandler().WriteToken(token) });
+});
+
+// ── Protected API endpoints ───────────────────────────────────────────────────
+var api = app.MapGroup("/api").RequireAuthorization();
+
+api.MapGet("/connectors", async (CasaTimoDbContext db) =>
     Results.Ok(await db.ConnectorConfigs.ToListAsync()));
 
-app.MapGet("/api/connectors/{name}", async (string name, CasaTimoDbContext db) =>
+api.MapGet("/connectors/{name}", async (string name, CasaTimoDbContext db) =>
 {
     var cfg = await db.ConnectorConfigs.FirstOrDefaultAsync(c => c.ConnectorName == name);
     return cfg is null ? Results.NotFound() : Results.Ok(cfg);
 });
 
-app.MapPut("/api/connectors/{name}", async (string name, HttpRequest request, CasaTimoDbContext db, IConfiguration config) =>
+api.MapPut("/connectors/{name}", async (string name, HttpRequest request, CasaTimoDbContext db) =>
 {
-    if (!request.Headers.TryGetValue("X-Admin-Password", out var provided))
-        return Results.Unauthorized();
-    var admin = config["AdminPassword"] ?? string.Empty;
-    if (string.IsNullOrEmpty(admin) || provided != admin)
-        return Results.Unauthorized();
-
     using var sr = new StreamReader(request.Body);
     var body = await sr.ReadToEndAsync();
     if (string.IsNullOrWhiteSpace(body)) return Results.BadRequest("empty body");
@@ -70,10 +124,10 @@ app.MapPut("/api/connectors/{name}", async (string name, HttpRequest request, Ca
     return Results.Ok(cfg);
 });
 
-app.MapGet("/api/devices", async (CasaTimoDbContext db) =>
+api.MapGet("/devices", async (CasaTimoDbContext db) =>
     Results.Ok(await db.Devices.Where(d => d.IsActive).ToListAsync()));
 
-app.MapGet("/api/sensors/live", async (CasaTimoDbContext db) =>
+api.MapGet("/sensors/live", async (CasaTimoDbContext db) =>
 {
     var latest = await db.SensorReadings
         .GroupBy(r => new { r.DeviceId, r.Metric })
@@ -82,20 +136,20 @@ app.MapGet("/api/sensors/live", async (CasaTimoDbContext db) =>
     return Results.Ok(latest);
 });
 
-app.MapGet("/api/sensors/history", async (string? deviceId, string? metric, DateTime? from, DateTime? to, CasaTimoDbContext db) =>
+api.MapGet("/sensors/history", async (string? deviceId, string? metric, DateTime? from, DateTime? to, CasaTimoDbContext db) =>
 {
     var query = db.SensorReadings.AsQueryable();
     if (!string.IsNullOrEmpty(deviceId)) query = query.Where(r => r.DeviceId == deviceId);
-    if (!string.IsNullOrEmpty(metric)) query = query.Where(r => r.Metric == metric);
+    if (!string.IsNullOrEmpty(metric))   query = query.Where(r => r.Metric == metric);
     if (from.HasValue) query = query.Where(r => r.Timestamp >= from.Value);
-    if (to.HasValue) query = query.Where(r => r.Timestamp <= to.Value);
+    if (to.HasValue)   query = query.Where(r => r.Timestamp <= to.Value);
     return Results.Ok(await query.OrderBy(r => r.Timestamp).ToListAsync());
 });
 
-app.MapGet("/api/bills", async (CasaTimoDbContext db) =>
+api.MapGet("/bills", async (CasaTimoDbContext db) =>
     Results.Ok(await db.Bills.OrderByDescending(b => b.DueDate).ToListAsync()));
 
-app.MapPost("/api/bills/{id}/paid", async (long id, CasaTimoDbContext db) =>
+api.MapPost("/bills/{id}/paid", async (long id, CasaTimoDbContext db) =>
 {
     var bill = await db.Bills.FindAsync(id);
     if (bill is null) return Results.NotFound();
@@ -104,13 +158,13 @@ app.MapPost("/api/bills/{id}/paid", async (long id, CasaTimoDbContext db) =>
     return Results.Ok(bill);
 });
 
-app.MapGet("/api/reminders", async (CasaTimoDbContext db) =>
+api.MapGet("/reminders", async (CasaTimoDbContext db) =>
     Results.Ok(await db.Reminders.Where(r => !r.IsSent).OrderBy(r => r.DueDate).ToListAsync()));
 
-app.MapGet("/api/maintenance", async (CasaTimoDbContext db) =>
+api.MapGet("/maintenance", async (CasaTimoDbContext db) =>
     Results.Ok(await db.MaintenanceRecords.OrderByDescending(m => m.Date).ToListAsync()));
 
-app.MapPost("/api/maintenance", async (MaintenanceRecord record, CasaTimoDbContext db) =>
+api.MapPost("/maintenance", async (MaintenanceRecord record, CasaTimoDbContext db) =>
 {
     db.MaintenanceRecords.Add(record);
     await db.SaveChangesAsync();
@@ -118,3 +172,5 @@ app.MapPost("/api/maintenance", async (MaintenanceRecord record, CasaTimoDbConte
 });
 
 app.Run();
+
+record LoginRequest(string Username, string Password);

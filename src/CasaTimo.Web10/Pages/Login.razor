@@ -1,0 +1,63 @@
+@page "/login"
+@using CasaTimo.Web10.Services
+@inject AuthService Auth
+@inject NavigationManager Nav
+
+<div class="d-flex justify-content-center align-items-center" style="min-height: 100vh; background: #f0f2f5;">
+    <div class="card shadow" style="width: 360px;">
+        <div class="card-body p-4">
+            <div class="text-center mb-4">
+                <h4 class="fw-bold mb-1">Casa Tim&#242;</h4>
+                <small class="text-muted">Accedi per continuare</small>
+            </div>
+
+            @if (_error != null)
+            {
+                <div class="alert alert-danger py-2">@_error</div>
+            }
+
+            <EditForm Model="_model" OnValidSubmit="HandleLogin">
+                <DataAnnotationsValidator />
+                <div class="mb-3">
+                    <label class="form-label">Utente</label>
+                    <InputText class="form-control" @bind-Value="_model.Username" autocomplete="username" />
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">Password</label>
+                    <InputText type="password" class="form-control" @bind-Value="_model.Password" autocomplete="current-password" />
+                </div>
+                <button type="submit" class="btn btn-primary w-100" disabled="@_loading">
+                    @if (_loading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Accedi
+                </button>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly LoginModel _model = new();
+    private bool _loading;
+    private string? _error;
+
+    private async Task HandleLogin()
+    {
+        _loading = true;
+        _error = null;
+        var ok = await Auth.LoginAsync(_model.Username, _model.Password);
+        _loading = false;
+        if (ok)
+            Nav.NavigateTo("/");
+        else
+            _error = "Credenziali non valide.";
+    }
+
+    private sealed class LoginModel
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+}

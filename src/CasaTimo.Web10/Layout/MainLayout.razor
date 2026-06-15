@@ -1,12 +1,21 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@using CasaTimo.Web10.Services
+@inject AuthService Auth
+@inject NavigationManager Nav
+
 <div class="page">
     <div class="sidebar">
         <NavMenu />
     </div>
 
     <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+        <div class="top-row px-4 d-flex justify-content-end align-items-center">
+            <AuthorizeView>
+                <Authorized>
+                    <span class="text-muted me-3 small">@context.User.Identity?.Name</span>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="Logout">Esci</button>
+                </Authorized>
+            </AuthorizeView>
         </div>
 
         <article class="content px-4">
@@ -14,3 +23,11 @@
         </article>
     </main>
 </div>
+
+@code {
+    private async Task Logout()
+    {
+        await Auth.LogoutAsync();
+        Nav.NavigateTo("/login", forceLoad: true);
+    }
+}
