@@ -1,11 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="it">
 
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CasaTimo.Web10</title>
+    <meta name="theme-color" content="#0d6efd" />
+    <title>Casa Tim&#242;</title>
     <base href="/" />
+    <link rel="manifest" href="manifest.json" />
     <link rel="preload" id="webassembly" />
     <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="css/app.css" />
@@ -24,10 +26,39 @@
     </div>
 
     <div id="blazor-error-ui">
-        An unhandled error has occurred.
-        <a href="." class="reload">Reload</a>
-        <span class="dismiss">🗙</span>
+        Si &egrave; verificato un errore.
+        <a href="." class="reload">Ricarica</a>
+        <span class="dismiss">&#x2715;</span>
     </div>
+
+    <script>
+        // Service worker registration + update detection
+        window.swUpdateAvailable = false;
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./service-worker.js').then(reg => {
+                reg.addEventListener('updatefound', () => {
+                    const newSW = reg.installing;
+                    if (!newSW) return;
+                    newSW.addEventListener('statechange', () => {
+                        if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+                            window.swUpdateAvailable = true;
+                        }
+                    });
+                });
+            });
+        }
+
+        window.checkSwUpdate = () => window.swUpdateAvailable;
+
+        window.applySwUpdate = () => {
+            navigator.serviceWorker.ready.then(reg => {
+                reg.waiting?.postMessage({ type: 'SKIP_WAITING' });
+            });
+            setTimeout(() => window.location.reload(), 300);
+        };
+    </script>
+
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
 </body>
 

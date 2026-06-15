@@ -12,9 +12,7 @@ services:
     restart: unless-stopped
 
   api:
-    build:
-      context: .
-      dockerfile: src/CasaTimo.Api/Dockerfile
+    image: ghcr.io/davidetimo/homebrain/casatimo-api:latest
     container_name: casatimo-api
     ports:
       - '5233:8080'
@@ -22,6 +20,12 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__CasaTimoDb=Data Source=/data/casatimo.db
       - AllowedOrigins__0=http://localhost:5001
+      - Jwt__Issuer=casatimo
+      - Jwt__Audience=casatimo
+      - Jwt__ExpiryDays=30
+      # Jwt__Key e Auth__Username / Auth__Password vanno in .env (mai committare)
+    env_file:
+      - .env
     volumes:
       - casatimo_data:/data
       - nas_storage:/mnt/nas
@@ -30,9 +34,7 @@ services:
     restart: unless-stopped
 
   workers:
-    build:
-      context: .
-      dockerfile: src/CasaTimo.Workers/Dockerfile
+    image: ghcr.io/davidetimo/homebrain/casatimo-workers:latest
     container_name: casatimo-workers
     environment:
       - DOTNET_ENVIRONMENT=Production
@@ -40,6 +42,8 @@ services:
       - Mqtt__Host=mosquitto
       - Mqtt__Port=1883
       - ConnectionStrings__CasaTimoDb=Data Source=/data/casatimo.db
+    env_file:
+      - .env
     volumes:
       - casatimo_data:/data
       - nas_storage:/mnt/nas
@@ -49,14 +53,26 @@ services:
     restart: unless-stopped
 
   web:
-    build:
-      context: .
-      dockerfile: src/CasaTimo.Web10/Dockerfile
+    image: ghcr.io/davidetimo/homebrain/casatimo-web:latest
     container_name: casatimo-web
     ports:
       - '5001:80'
     depends_on:
       - api
+    restart: unless-stopped
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: casatimo-watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ~/.docker/config.json:/config.json:ro
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=300
+      - WATCHTOWER_INCLUDE_RESTARTING=true
+      - WATCHTOWER_SCOPE=casatimo
+    command: --label-enable
     restart: unless-stopped
 
 volumes:

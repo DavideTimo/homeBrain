@@ -1,0 +1,67 @@
+name: Build & Publish Docker Images
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/homebrain
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & push API
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: src/CasaTimo.Api/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/casatimo-api:latest
+            ${{ env.IMAGE_PREFIX }}/casatimo-api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & push Workers
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: src/CasaTimo.Workers/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/casatimo-workers:latest
+            ${{ env.IMAGE_PREFIX }}/casatimo-workers:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & push Web
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: src/CasaTimo.Web10/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/casatimo-web:latest
+            ${{ env.IMAGE_PREFIX }}/casatimo-web:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

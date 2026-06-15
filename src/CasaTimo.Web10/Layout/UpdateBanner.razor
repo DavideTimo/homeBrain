@@ -1,0 +1,38 @@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+@if (_updateAvailable)
+{
+    <div class="alert alert-info d-flex justify-content-between align-items-center mb-0 rounded-0 border-0 border-bottom"
+         style="position: sticky; top: 0; z-index: 1050;">
+        <span>&#x1F504; &Egrave; disponibile una nuova versione di Casa Tim&#242;.</span>
+        <button class="btn btn-sm btn-primary ms-3" @onclick="ApplyUpdate">Aggiorna ora</button>
+    </div>
+}
+
+@code {
+    private bool _updateAvailable;
+    private Timer? _timer;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender) return;
+        _timer = new Timer(async _ =>
+        {
+            var available = await JS.InvokeAsync<bool>("checkSwUpdate");
+            if (available && !_updateAvailable)
+            {
+                _updateAvailable = true;
+                await InvokeAsync(StateHasChanged);
+            }
+        }, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30));
+    }
+
+    private async Task ApplyUpdate()
+        => await JS.InvokeVoidAsync("applySwUpdate");
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_timer != null) await _timer.DisposeAsync();
+    }
+}

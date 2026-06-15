@@ -1,0 +1,20 @@
+# Secrets — mai committare
+.env
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.db
+*.db-shm
+*.db-wal
+
+# Docker volumes
+mosquitto/data/
+mosquitto/log/
+
+# OS
+.DS_Store
+Thumbs.db
