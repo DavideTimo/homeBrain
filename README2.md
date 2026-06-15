@@ -80,7 +80,7 @@ docker compose logs -f     # (opzionale) segui i log in tempo reale
 
 | Servizio | Porta locale | Descrizione |
 |---|---|---|
-| `casatimo-web` | 5001 | Blazor WASM (frontend) |
+| `casatimo-web` | 5001 | Blazor WASM (frontend — MudBlazor) |
 | `casatimo-api` | 5233 | ASP.NET Core API |
 | `casatimo-workers` | — | Background services |
 | `casatimo-mosquitto` | 1883, 9001 | MQTT broker |
