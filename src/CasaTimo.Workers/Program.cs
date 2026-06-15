@@ -16,6 +16,7 @@ builder.Services.AddHttpClient("viessmann");
 builder.Services.AddHostedService<ViessmannConnector>();
 
 builder.Services.AddHostedService<Worker>();
+builder.Services.AddHostedService<HistoryRecorder>();
 
 var host = builder.Build();
 host.Run();

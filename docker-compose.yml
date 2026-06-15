@@ -8,8 +8,59 @@ services:
     volumes:
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log
+      - ./mosquitto/config:/mosquitto/config:ro
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: src/CasaTimo.Api/Dockerfile
+    container_name: casatimo-api
+    ports:
+      - '5233:8080'
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__CasaTimoDb=Data Source=/data/casatimo.db
+      - AllowedOrigins__0=http://localhost:5001
+    volumes:
+      - casatimo_data:/data
+      - nas_storage:/mnt/nas
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+
+  workers:
+    build:
+      context: .
+      dockerfile: src/CasaTimo.Workers/Dockerfile
+    container_name: casatimo-workers
+    environment:
+      - DOTNET_ENVIRONMENT=Production
+      - ApiBaseUrl=http://api:8080
+      - Mqtt__Host=mosquitto
+      - Mqtt__Port=1883
+      - ConnectionStrings__CasaTimoDb=Data Source=/data/casatimo.db
+    volumes:
+      - casatimo_data:/data
+      - nas_storage:/mnt/nas
+    depends_on:
+      - mosquitto
+      - api
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: src/CasaTimo.Web10/Dockerfile
+    container_name: casatimo-web
+    ports:
+      - '5001:80'
+    depends_on:
+      - api
     restart: unless-stopped
 
 volumes:
   mosquitto_data:
   mosquitto_log:
+  casatimo_data:
+  nas_storage:

@@ -1,7 +1,187 @@
-﻿@page "/"
+@page "/"
+@using CasaTimo.Web10.Models
+@using CasaTimo.Web10.Services
+@inject ApiClient Api
+@implements IDisposable
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Dashboard &mdash; Casa Tim&#242;</PageTitle>
 
-<h1>Hello, world!</h1>
+<h1 class="mb-4">Dashboard &mdash; Casa Tim&#242;</h1>
 
-Welcome to your new app.
+<section class="mb-5">
+    <div class="d-flex align-items-center mb-3">
+        <h2 class="mb-0 me-3">Sensori Live</h2>
+        <small class="text-muted">Aggiornamento automatico ogni 30s</small>
+    </div>
+
+    @if (_sensorsLoading)
+    {
+        <div class="alert alert-info">Caricamento sensori...</div>
+    }
+    else if (_sensorsError != null)
+    {
+        <div class="alert alert-danger">
+            <strong>Errore API:</strong> @_sensorsError
+        </div>
+    }
+    else if (_sensorGroups == null || _sensorGroups.Count == 0)
+    {
+        <div class="alert alert-secondary">Nessun dato sensore disponibile.</div>
+    }
+    else
+    {
+        <div class="row g-3">
+            @foreach (var group in _sensorGroups)
+            {
+                <div class="col-12 col-md-6 col-xl-4">
+                    <div class="card h-100">
+                        <div class="card-header fw-semibold">
+                            @group.Key
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-sm mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Metrica</th>
+                                        <th>Valore</th>
+                                        <th>Unit&#224;</th>
+                                        <th>Timestamp</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var r in group.Value)
+                                    {
+                                        <tr>
+                                            <td>@r.Metric</td>
+                                            <td><strong>@r.Value.ToString("G4")</strong></td>
+                                            <td>@(r.Unit ?? "—")</td>
+                                            <td class="text-muted" style="font-size:0.8em">@r.Timestamp.ToLocalTime().ToString("HH:mm:ss")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</section>
+
+<section class="mb-5">
+    <h2 class="mb-3">Reminder Attivi</h2>
+
+    @if (_remindersLoading)
+    {
+        <div class="alert alert-info">Caricamento reminder...</div>
+    }
+    else if (_remindersError != null)
+    {
+        <div class="alert alert-danger">
+            <strong>Errore API:</strong> @_remindersError
+        </div>
+    }
+    else if (_activeReminders == null || _activeReminders.Count == 0)
+    {
+        <div class="alert alert-success">
+            &#10003; Nessuna scadenza imminente.
+        </div>
+    }
+    else
+    {
+        <div class="row g-3">
+            @foreach (var r in _activeReminders)
+            {
+                var daysLeft = (int)(r.DueDate.Date - DateTime.Today).TotalDays;
+                var alertClass = daysLeft <= 3 ? "alert-danger" : daysLeft <= 7 ? "alert-warning" : "alert-info";
+                <div class="col-12 col-md-6">
+                    <div class="alert @alertClass mb-0">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong>@(r.Message ?? $"Reminder bolletta #{r.BillId}")</strong>
+                            <span class="badge bg-dark">
+                                @if (daysLeft == 0) { <text>Oggi</text> }
+                                else if (daysLeft < 0) { <text>Scaduto</text> }
+                                else { <text>tra @daysLeft giorni</text> }
+                            </span>
+                        </div>
+                        <small>Scadenza: @r.DueDate.ToString("dd/MM/yyyy")</small>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private bool _sensorsLoading = true;
+    private bool _remindersLoading = true;
+    private string? _sensorsError;
+    private string? _remindersError;
+    private Dictionary<string, List<SensorReadingDto>>? _sensorGroups;
+    private List<ReminderDto>? _activeReminders;
+    private Timer? _timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAllAsync();
+        _timer = new Timer(async _ =>
+        {
+            await LoadAllAsync();
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+    }
+
+    private async Task LoadAllAsync()
+    {
+        await Task.WhenAll(LoadSensorsAsync(), LoadRemindersAsync());
+    }
+
+    private async Task LoadSensorsAsync()
+    {
+        _sensorsLoading = true;
+        _sensorsError = null;
+        try
+        {
+            var readings = await Api.GetSensorLiveAsync();
+            _sensorGroups = readings?
+                .GroupBy(r => r.DeviceId)
+                .ToDictionary(g => g.Key, g => g.ToList())
+                ?? new Dictionary<string, List<SensorReadingDto>>();
+        }
+        catch (Exception ex)
+        {
+            _sensorsError = ex.Message;
+            _sensorGroups = null;
+        }
+        finally
+        {
+            _sensorsLoading = false;
+        }
+    }
+
+    private async Task LoadRemindersAsync()
+    {
+        _remindersLoading = true;
+        _remindersError = null;
+        try
+        {
+            var all = await Api.GetRemindersAsync();
+            _activeReminders = all?.Where(r => !r.IsSent).OrderBy(r => r.DueDate).ToList()
+                ?? new List<ReminderDto>();
+        }
+        catch (Exception ex)
+        {
+            _remindersError = ex.Message;
+            _activeReminders = null;
+        }
+        finally
+        {
+            _remindersLoading = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+}
