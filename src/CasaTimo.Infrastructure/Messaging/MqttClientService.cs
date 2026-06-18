@@ -15,6 +15,8 @@ public class MqttClientService : IHostedService, IDisposable
     private IMqttClient? _client;
     private MqttOptions _options = new();
 
+    public event Func<string, string, Task>? MessageReceived;
+
     public MqttClientService(IConfiguration configuration, ILogger<MqttClientService> logger)
     {
         _configuration = configuration;
@@ -38,14 +40,22 @@ public class MqttClientService : IHostedService, IDisposable
                 {
                     try
                     {
-                        var payload = e.ApplicationMessage.Payload == null ? string.Empty : Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
-                        _logger.LogInformation("MQTT msg received: {topic} -> {payload}", e.ApplicationMessage.Topic, payload);
+                        var topic = e.ApplicationMessage.Topic;
+                        var payload = e.ApplicationMessage.Payload == null
+                            ? string.Empty
+                            : Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
+                        _logger.LogInformation("MQTT msg received: {topic} -> {payload}", topic, payload);
+
+                        if (MessageReceived != null)
+                        {
+                            foreach (var handler in MessageReceived.GetInvocationList().Cast<Func<string, string, Task>>())
+                                await handler(topic, payload);
+                        }
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error processing MQTT message");
                     }
-                    await Task.CompletedTask;
                 };
             }
             catch

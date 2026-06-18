@@ -10,10 +10,11 @@
 using System;
 using System.Reflection;
 
+[assembly: Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute("dotnet-CasaTimo.Api-f3a1b2c4-d5e6-7890-abcd-ef1234567890")]
 [assembly: System.Reflection.AssemblyCompanyAttribute("CasaTimo.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a48bdf8e2b69386dd154545ca321744f215c9244")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5d85fd4d34ad247c944a5b017f08c26100f8d8d8")]
 [assembly: System.Reflection.AssemblyProductAttribute("CasaTimo.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CasaTimo.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

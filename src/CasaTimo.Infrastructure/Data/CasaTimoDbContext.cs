@@ -19,7 +19,16 @@ public class CasaTimoDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
         modelBuilder.Entity<Device>().HasKey(d => d.Id);
+
         modelBuilder.Entity<SensorReading>().HasKey(r => r.Id);
+        modelBuilder.Entity<SensorReading>()
+            .HasIndex(r => new { r.DeviceId, r.Timestamp });
+
+        modelBuilder.Entity<Bill>()
+            .HasIndex(b => b.EmailId)
+            .IsUnique()
+            .HasFilter("[EmailId] IS NOT NULL");
     }
 }

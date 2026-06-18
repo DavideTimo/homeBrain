@@ -1076,10 +1076,10 @@ C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBra
 C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web\obj\Debug\net10.0\compressed\6k3xl28zng-{0}-hq61ozpvxa-hq61ozpvxa.gz
 C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web\obj\Debug\net10.0\compressed\1xwlvx0jep-{0}-qltknulxmy-qltknulxmy.gz
 C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web\obj\Debug\net10.0\compressed\tltr3nbc8h-{0}-vibclmvzbq-vibclmvzbq.gz
-C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web\bin\Debug\net10.0\wwwroot\_framework\CasaTimo.Web.4bq2h5t172.wasm
-C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web\bin\Debug\net10.0\wwwroot\_framework\CasaTimo.Web.4d7y92menj.pdb
-C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web\bin\Debug\net10.0\wwwroot\_framework\CasaTimo.Web.4bq2h5t172.wasm.gz
-C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web\bin\Debug\net10.0\wwwroot\_framework\CasaTimo.Web.4d7y92menj.pdb.gz
-C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web\obj\Debug\net10.0\compressed\go7ibyttk9-{0}-4bq2h5t172-4bq2h5t172.gz
-C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web\obj\Debug\net10.0\compressed\1ngg957rd7-{0}-4d7y92menj-4d7y92menj.gz
-C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web\obj\Debug\net10.0\compressed\26pace0kfd-{0}-0x18j9dekb-0x18j9dekb.gz
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web\bin\Debug\net10.0\wwwroot\_framework\CasaTimo.Web.nu9eovpwis.wasm
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web\bin\Debug\net10.0\wwwroot\_framework\CasaTimo.Web.5sr7vj12fj.pdb
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web\bin\Debug\net10.0\wwwroot\_framework\CasaTimo.Web.nu9eovpwis.wasm.gz
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web\bin\Debug\net10.0\wwwroot\_framework\CasaTimo.Web.5sr7vj12fj.pdb.gz
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web\obj\Debug\net10.0\compressed\go7ibyttk9-{0}-nu9eovpwis-nu9eovpwis.gz
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web\obj\Debug\net10.0\compressed\1ngg957rd7-{0}-5sr7vj12fj-5sr7vj12fj.gz
+C:\Users\david\OneDrive - MB Engineering srl\Documenti\Progetti software\HomeBrain\homeBrain\src\CasaTimo.Web\obj\Debug\net10.0\compressed\26pace0kfd-{0}-ubq7f5a451-ubq7f5a451.gz

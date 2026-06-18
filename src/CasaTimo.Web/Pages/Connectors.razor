@@ -1,108 +1,159 @@
 @page "/connectors"
-
+@using System.Net.Http.Headers
+@using System.Net.Http.Json
 @inject HttpClient Http
 
 <PageTitle>Connectors</PageTitle>
 
 <h3>Connectors (Admin)</h3>
 
-<div class="mb-3">
-    <label class="form-label">Admin password</label>
-    <input class="form-control" @bind="AdminPassword" type="password" />
-    <button class="btn btn-primary mt-2" @onclick="LoadConnectors">Load Connectors</button>
-</div>
-
-@if (ConnectorList is null)
+@if (_token is null)
 {
-    <p>No connectors loaded.</p>
+    <div class="mb-3" style="max-width:360px">
+        <label class="form-label">Admin password</label>
+        <input class="form-control" @bind="_password" type="password" @onkeydown="OnKeyDown" />
+        <button class="btn btn-primary mt-2 w-100" @onclick="Login" disabled="@_loading">
+            @(_loading ? "Accesso…" : "Login")
+        </button>
+        @if (_loginError)
+        {
+            <div class="alert alert-danger mt-2 mb-0">Password errata.</div>
+        }
+    </div>
 }
 else
 {
-    <div class="row">
-        <div class="col-4">
-            <ul class="list-group">
-                @foreach (var c in ConnectorList)
-                {
-                    <li class="list-group-item" @onclick="() => SelectConnector(c.ConnectorName)">
-                        @c.ConnectorName
-                    </li>
-                }
-            </ul>
-        </div>
-        <div class="col-8">
-            @if (Selected is not null)
-            {
-                <h5>@Selected.ConnectorName</h5>
-                <label>Settings JSON</label>
-                <textarea class="form-control" style="height:300px" @bind="Selected.SettingsJson"></textarea>
-                <button class="btn btn-success mt-2" @onclick="SaveSelected">Save</button>
-            }
-            else
-            {
-                <p>Select a connector to view/edit settings.</p>
-            }
-        </div>
+    <div class="mb-3 d-flex align-items-center gap-2">
+        <span class="badge bg-success">Autenticato</span>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="Logout">Logout</button>
     </div>
+
+    @if (ConnectorList is null)
+    {
+        <p>Nessun connector caricato.</p>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-4">
+                <ul class="list-group">
+                    @foreach (var c in ConnectorList)
+                    {
+                        <li class="list-group-item list-group-item-action" @onclick="() => SelectConnector(c.ConnectorName)">
+                            @c.ConnectorName
+                        </li>
+                    }
+                </ul>
+            </div>
+            <div class="col-8">
+                @if (Selected is not null)
+                {
+                    <h5>@Selected.ConnectorName</h5>
+                    <label class="form-label">Settings JSON</label>
+                    <textarea class="form-control font-monospace" style="height:300px" @bind="Selected.SettingsJson"></textarea>
+                    @if (_saveMessage is not null)
+                    {
+                        <div class="alert @(_saveError ? "alert-danger" : "alert-success") mt-2 mb-0">@_saveMessage</div>
+                    }
+                    <button class="btn btn-success mt-2" @onclick="SaveSelected">Salva</button>
+                }
+                else
+                {
+                    <p>Seleziona un connector per visualizzarne/modificarne le impostazioni.</p>
+                }
+            </div>
+        </div>
+    }
 }
 
 @code {
-    private string AdminPassword { get; set; } = string.Empty;
-    private List<ConnectorDto>? ConnectorList { get; set; }
-    private ConnectorDto? Selected { get; set; }
+    private const string ApiBase = "http://localhost:5233";
+
+    private string _password = string.Empty;
+    private string? _token;
+    private bool _loading;
+    private bool _loginError;
+    private string? _saveMessage;
+    private bool _saveError;
+
+    private List<ConnectorDto>? ConnectorList;
+    private ConnectorDto? Selected;
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Login();
+    }
+
+    private async Task Login()
+    {
+        _loading = true;
+        _loginError = false;
+        try
+        {
+            var resp = await Http.PostAsJsonAsync($"{ApiBase}/api/auth/token", new { Password = _password });
+            if (!resp.IsSuccessStatusCode) { _loginError = true; return; }
+
+            var result = await resp.Content.ReadFromJsonAsync<TokenResponse>();
+            _token = result?.Token;
+            await LoadConnectors();
+        }
+        catch { _loginError = true; }
+        finally { _loading = false; }
+    }
+
+    private void Logout()
+    {
+        _token = null;
+        _password = string.Empty;
+        ConnectorList = null;
+        Selected = null;
+        _saveMessage = null;
+    }
 
     private async Task LoadConnectors()
     {
         try
         {
-            var req = new HttpRequestMessage(HttpMethod.Get, "http://localhost:5233/api/connectors");
-            var resp = await Http.SendAsync(req);
-            if (!resp.IsSuccessStatusCode) return;
-            ConnectorList = await resp.Content.ReadFromJsonAsync<List<ConnectorDto>>();
+            ConnectorList = await Http.GetFromJsonAsync<List<ConnectorDto>>($"{ApiBase}/api/connectors");
             Selected = ConnectorList?.FirstOrDefault();
-            StateHasChanged();
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex.Message);
-        }
+        catch { }
     }
 
     private async Task SelectConnector(string name)
     {
-        if (string.IsNullOrWhiteSpace(name)) return;
         try
         {
-            var req = new HttpRequestMessage(HttpMethod.Get, $"http://localhost:5233/api/connectors/{name}");
-            var resp = await Http.SendAsync(req);
-            if (!resp.IsSuccessStatusCode) return;
-            Selected = await resp.Content.ReadFromJsonAsync<ConnectorDto>();
-            StateHasChanged();
+            Selected = await Http.GetFromJsonAsync<ConnectorDto>($"{ApiBase}/api/connectors/{name}");
+            _saveMessage = null;
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex.Message);
-        }
+        catch { }
     }
 
     private async Task SaveSelected()
     {
-        if (Selected == null) return;
+        if (Selected is null || _token is null) return;
+        _saveMessage = null;
         try
         {
-            var req = new HttpRequestMessage(HttpMethod.Put, $"http://localhost:5233/api/connectors/{Selected.ConnectorName}");
-            req.Headers.Add("X-Admin-Password", AdminPassword);
+            var req = new HttpRequestMessage(HttpMethod.Put, $"{ApiBase}/api/connectors/{Selected.ConnectorName}");
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
             req.Content = new StringContent(Selected.SettingsJson ?? string.Empty, System.Text.Encoding.UTF8, "application/json");
+
             var resp = await Http.SendAsync(req);
-            if (resp.IsSuccessStatusCode)
-            {
-                await LoadConnectors();
-            }
+            _saveError = !resp.IsSuccessStatusCode;
+            _saveMessage = resp.IsSuccessStatusCode ? "Salvato con successo." : $"Errore: {resp.StatusCode}";
+
+            if (resp.IsSuccessStatusCode) await LoadConnectors();
         }
         catch (Exception ex)
         {
-            Console.WriteLine(ex.Message);
+            _saveError = true;
+            _saveMessage = ex.Message;
         }
     }
+
+    private record TokenResponse(string Token);
 
     private class ConnectorDto
     {

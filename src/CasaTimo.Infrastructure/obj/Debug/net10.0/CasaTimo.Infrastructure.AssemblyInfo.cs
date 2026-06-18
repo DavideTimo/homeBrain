@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CasaTimo.Infrastructure")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a48bdf8e2b69386dd154545ca321744f215c9244")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5d85fd4d34ad247c944a5b017f08c26100f8d8d8")]
 [assembly: System.Reflection.AssemblyProductAttribute("CasaTimo.Infrastructure")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CasaTimo.Infrastructure")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

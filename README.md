@@ -36,7 +36,7 @@ Sviluppo di una **web app domestica unificata** in C# / Blazor che:
 
 | Layer | Tecnologia | Note |
 |---|---|---|
-| Frontend | Blazor WebAssembly (.NET 9) | PWA, accessibile da mobile |
+| Frontend | Blazor WebAssembly (.NET 10) | PWA, accessibile da mobile |
 | API | ASP.NET Core Minimal API | REST + WebSocket + SignalR |
 | Worker services | C# Background Services | Connettori e BillWatcher |
 | Message broker | Mosquitto (MQTT) | Bus condiviso sensori |
