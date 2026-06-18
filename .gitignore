@@ -1,0 +1,18 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.db
+*.db-shm
+*.db-wal
+
+# Secrets
+.env
+sidecar-viessmann/data/viessmann_token.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo

@@ -1,16 +1,101 @@
-﻿@page "/"
+@page "/"
 
-<PageTitle>Home</PageTitle>
+<PageTitle>CasaTimo — Home</PageTitle>
 
-<h1>CasaTimo</h1>
+<div class="d-flex align-items-center mb-4 gap-3">
+    <div>
+        <h1 class="mb-0">Casa Timò</h1>
+        <p class="text-muted mb-0">Piattaforma domotica unificata</p>
+    </div>
+    <span class="badge bg-success ms-auto">API online</span>
+</div>
 
-<p>Benvenuto nella piattaforma CasaTimo.</p>
+<div class="row g-3 mb-4">
+    <div class="col-md-6 col-lg-3">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="fs-3 me-2">⚡</span>
+                    <h6 class="card-title mb-0">Fotovoltaico</h6>
+                </div>
+                <p class="card-text text-muted small">Produzione FV, batteria e scambi con la rete.</p>
+                <span class="badge bg-secondary">In arrivo — Step 5</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="fs-3 me-2">🌡️</span>
+                    <h6 class="card-title mb-0">Pompa di calore</h6>
+                </div>
+                <p class="card-text text-muted small">Temperature, modalità operativa e COP.</p>
+                <span class="badge bg-warning text-dark">Connettore in corso — Step 4</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="fs-3 me-2">📄</span>
+                    <h6 class="card-title mb-0">Bollette</h6>
+                </div>
+                <p class="card-text text-muted small">Importazione automatica da Gmail, scadenze e storico spese.</p>
+                <span class="badge bg-secondary">In arrivo — Step 7</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="fs-3 me-2">🔌</span>
+                    <h6 class="card-title mb-0">Connectors</h6>
+                </div>
+                <p class="card-text text-muted small">Configurazione dei connettori dispositivo via interfaccia admin.</p>
+                <a href="/connectors" class="badge bg-success text-decoration-none">Disponibile →</a>
+            </div>
+        </div>
+    </div>
+</div>
 
-<ul>
-    <li>Dashboard impianti</li>
-    <li>Storico energia</li>
-    <li>Gestione bollette</li>
-    <li>Reminder scadenze</li>
-</ul>
-
-<p>La Web App è pronta per comunicare con l'API di backend.</p>
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-transparent fw-semibold">Stato infrastruttura</div>
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    API Backend
+                    <span class="badge bg-success">Online</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    MQTT Broker
+                    <span class="badge bg-success">Online</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    HistoryRecorder
+                    <span class="badge bg-success">Attivo</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    Viessmann Connector
+                    <span class="badge bg-warning text-dark">Da configurare</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-transparent fw-semibold">Roadmap</div>
+            <ul class="list-group list-group-flush small">
+                <li class="list-group-item">✅ Step 1–3 — Scaffolding, modelli, MQTT</li>
+                <li class="list-group-item">✅ Step 6 — HistoryRecorder</li>
+                <li class="list-group-item">🔄 Step 4 — Connettore Viessmann</li>
+                <li class="list-group-item text-muted">⬜ Step 5 — Huawei FusionSolar</li>
+                <li class="list-group-item text-muted">⬜ Step 7 — BillWatcher (Gmail)</li>
+                <li class="list-group-item text-muted">⬜ Step 9 — Dashboard real-time</li>
+            </ul>
+        </div>
+    </div>
+</div>

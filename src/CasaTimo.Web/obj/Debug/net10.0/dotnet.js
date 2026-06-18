@@ -5,7 +5,7 @@ var e=!1;const t=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,
   "mainAssemblyName": "CasaTimo.Web",
   "applicationEnvironment": "Development",
   "resources": {
-    "hash": "sha256-FtyGSy79WuluugOzsIx7vaXJZ1/WfLfTmo7Ya8oSajc=",
+    "hash": "sha256-cfMjUFNon7yHBprOZURCV2Drh1ASpeGVG/Z4d0KeWuQ=",
     "jsModuleNative": [
       {
         "name": "dotnet.native.ikrs475e5v.js"
@@ -1242,16 +1242,16 @@ var e=!1;const t=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,
       },
       {
         "virtualPath": "CasaTimo.Web.wasm",
-        "name": "CasaTimo.Web.nu9eovpwis.wasm",
-        "hash": "sha256-oVKyZ/dyUIzr61ypARu+ifEI8ek1qQ4Qir5y/u34j9s=",
+        "name": "CasaTimo.Web.buvqk3lxg6.wasm",
+        "hash": "sha256-TcxhmxnXAnDV4jmUDSCeaIT5OBpElXWZyrKkB0ojBtU=",
         "cache": "force-cache"
       }
     ],
     "pdb": [
       {
         "virtualPath": "CasaTimo.Web.pdb",
-        "name": "CasaTimo.Web.5sr7vj12fj.pdb",
-        "hash": "sha256-mzyPvqChz/mu52IOnazvVlU7Unbn6Kwna9xFieXzjSI=",
+        "name": "CasaTimo.Web.qrb9ji963y.pdb",
+        "hash": "sha256-1i6VcGFSADsIxJwEVPOz4HaXgzvXLrDtcisXEombaW8=",
         "cache": "force-cache"
       }
     ],
