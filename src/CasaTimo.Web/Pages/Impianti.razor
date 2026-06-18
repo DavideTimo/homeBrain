@@ -1,0 +1,190 @@
+@page "/impianti"
+@using System.Net.Http.Json
+@inject HttpClient Http
+@implements IDisposable
+
+<PageTitle>Impianti — Casa Timò</PageTitle>
+
+<div class="d-flex align-items-center gap-2 mb-4">
+    <h2 class="mb-0">Impianti</h2>
+    @if (_readings is not null)
+    {
+        <span class="badge @(_isDataFresh ? "bg-success" : "bg-warning text-dark") ms-1">
+            @(_isDataFresh ? "● Live" : "⚠ Dati vecchi")
+        </span>
+    }
+    <button class="btn btn-sm btn-outline-secondary ms-auto" @onclick="Refresh" disabled="@_loading">
+        @(_loading ? "…" : "↻")
+    </button>
+    <small class="text-muted">@_lastUpdateText</small>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-warning d-flex align-items-center gap-2">
+        <span>⚠️</span>
+        <span>@_error — assicurati che l'API sia avviata e che il sidecar Viessmann abbia eseguito almeno un poll.</span>
+    </div>
+}
+
+<!-- ── Pompa di calore ─────────────────────────────────────────── -->
+<h6 class="text-muted text-uppercase fw-semibold mb-3 mt-2">🌡️ Pompa di calore — Vitocal 222-S</h6>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4 col-lg-3">
+        @MetricCard("🌤️", "Temperatura esterna", Get("pdc", "outdoor_temp"))
+    </div>
+    <div class="col-6 col-md-4 col-lg-3">
+        @MetricCard("🔄", "Ritorno impianto", Get("pdc", "return_temp"))
+    </div>
+    <div class="col-6 col-md-4 col-lg-3">
+        @MetricCard("🚿", "Acqua calda (ACS)", Get("pdc", "dhw_temp"))
+    </div>
+    <div class="col-6 col-md-4 col-lg-3">
+        @MetricCard("❄️", "Mandata impianto", Get("pdc", "supply_temp"))
+    </div>
+</div>
+
+<!-- Stato operativo -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body d-flex flex-wrap gap-3 align-items-center py-3">
+        <div>
+            <span class="text-muted small d-block">Compressore</span>
+            @{
+                var comp = Get("pdc", "compressor_active");
+                var compOn = comp is not null && comp.Value > 0.5;
+            }
+            <span class="badge @(comp is null ? "bg-secondary" : compOn ? "bg-success" : "bg-secondary") fs-6 px-3">
+                @(comp is null ? "—" : compOn ? "● ON" : "○ OFF")
+            </span>
+        </div>
+        <div class="vr d-none d-md-block"></div>
+        <div>
+            <span class="text-muted small d-block">Modalità</span>
+            @{
+                var modeReading = Get("pdc", "mode_code");
+                var modeLabel = ModeLabel(modeReading);
+            }
+            <span class="badge bg-info text-dark fs-6 px-3">@modeLabel</span>
+        </div>
+        <div class="vr d-none d-md-block"></div>
+        <div class="ms-md-auto text-muted small">
+            Aggiornamento automatico ogni 60s
+        </div>
+    </div>
+</div>
+
+<!-- ── Placeholder sezioni future ─────────────────────────────── -->
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100 opacity-50">
+            <div class="card-body text-center py-5 text-muted">
+                <div class="fs-1 mb-2">☀️</div>
+                <div class="fw-semibold">Fotovoltaico + Batteria</div>
+                <small>Disponibile dopo Step 5 (Huawei sidecar)</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100 opacity-50">
+            <div class="card-body text-center py-5 text-muted">
+                <div class="fs-1 mb-2">🔌</div>
+                <div class="fw-semibold">Wallbox</div>
+                <small>Disponibile dopo Step 5 (OCPP sidecar)</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private const string ApiBase = "http://localhost:5233";
+
+    private List<SensorReading>? _readings;
+    private bool _loading = true;
+    private string? _error;
+    private string _lastUpdateText = "";
+    private bool _isDataFresh = false;
+    private System.Threading.Timer? _timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Refresh();
+        _timer = new System.Threading.Timer(async _ =>
+        {
+            await Refresh();
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
+    }
+
+    private async Task Refresh()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _readings = await Http.GetFromJsonAsync<List<SensorReading>>($"{ApiBase}/api/sensors/live");
+            _lastUpdateText = $"Aggiornato alle {DateTime.Now:HH:mm:ss}";
+
+            // Dati freschi se l'ultima lettura è più recente di 15 minuti
+            var latest = _readings?.MaxBy(r => r.Timestamp)?.Timestamp;
+            _isDataFresh = latest.HasValue && (DateTime.UtcNow - latest.Value).TotalMinutes < 15;
+        }
+        catch
+        {
+            _error = "Impossibile raggiungere l'API";
+            _readings = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private SensorReading? Get(string deviceId, string metric) =>
+        _readings?.FirstOrDefault(r => r.DeviceId == deviceId && r.Metric == metric);
+
+    private static string ModeLabel(SensorReading? r)
+    {
+        if (r is null) return "—";
+        return (int)r.Value switch
+        {
+            0 => "Standby",
+            1 => "Riscaldamento",
+            2 => "Raffrescamento",
+            3 => "ACS + Riscaldamento",
+            4 => "ACS + Raffrescamento",
+            5 => "Solo ACS",
+            6 => "Forzato normale",
+            _ => "—"
+        };
+    }
+
+    private RenderFragment MetricCard(string icon, string label, SensorReading? r) =>
+        @<div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center py-3">
+                <div class="fs-2 mb-1">@icon</div>
+                @if (r is null)
+                {
+                    <div class="fs-5 text-muted fw-bold">—</div>
+                }
+                else
+                {
+                    <div class="fs-4 fw-bold text-primary">
+                        @r.Value.ToString("F1")<small class="fs-6 ms-1 text-muted">@r.Unit</small>
+                    </div>
+                }
+                <div class="text-muted small mt-1">@label</div>
+            </div>
+        </div>;
+
+    public void Dispose() => _timer?.Dispose();
+
+    private class SensorReading
+    {
+        public string DeviceId { get; set; } = "";
+        public string Metric { get; set; } = "";
+        public double Value { get; set; }
+        public string? Unit { get; set; }
+        public DateTime Timestamp { get; set; }
+    }
+}

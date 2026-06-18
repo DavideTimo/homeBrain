@@ -29,8 +29,22 @@ public class HistoryRecorder : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Aspetta che MqttClientService si connetta (max 30 secondi)
+        for (int i = 0; i < 30 && !stoppingToken.IsCancellationRequested; i++)
+        {
+            if (_mqtt.IsConnected) break;
+            await Task.Delay(1000, stoppingToken);
+        }
+
+        if (!_mqtt.IsConnected)
+        {
+            _logger.LogWarning("HistoryRecorder: MQTT non connesso dopo 30s, skip subscribe.");
+            return;
+        }
+
         _mqtt.MessageReceived += HandleMessageAsync;
         await _mqtt.SubscribeAsync("casatimo/#", stoppingToken);
+        _logger.LogInformation("HistoryRecorder: in ascolto su casatimo/#");
         await Task.Delay(Timeout.Infinite, stoppingToken).ContinueWith(_ => { });
     }
 

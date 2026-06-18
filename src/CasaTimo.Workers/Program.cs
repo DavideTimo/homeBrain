@@ -31,4 +31,12 @@ builder.Services.AddHostedService<ViessmannConnector>();
 builder.Services.AddHostedService<Worker>();
 
 var host = builder.Build();
+
+// Crea lo schema DB se non esiste (necessario per HistoryRecorder)
+using (var scope = host.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<CasaTimoDbContext>();
+    db.Database.EnsureCreated();
+}
+
 host.Run();

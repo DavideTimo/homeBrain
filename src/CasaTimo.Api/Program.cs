@@ -85,6 +85,64 @@ app.MapPost("/api/auth/token", (LoginRequest req, IConfiguration config) =>
     return Results.Ok(new { token = new JwtSecurityTokenHandler().WriteToken(token) });
 });
 
+// ── Sensors ──────────────────────────────────────────────────────────────────
+
+// Ultimo valore per ogni combinazione deviceId/metric
+app.MapGet("/api/sensors/live", async (CasaTimoDbContext db) =>
+{
+    var latestIds = db.SensorReadings
+        .GroupBy(r => new { r.DeviceId, r.Metric })
+        .Select(g => g.Max(r => r.Id));
+
+    var readings = await db.SensorReadings
+        .Where(r => latestIds.Contains(r.Id))
+        .OrderBy(r => r.DeviceId).ThenBy(r => r.Metric)
+        .ToListAsync();
+
+    return Results.Ok(readings);
+});
+
+// Storico con filtri opzionali
+app.MapGet("/api/sensors/history", async (
+    CasaTimoDbContext db,
+    string? deviceId,
+    string? metric,
+    DateTime? from,
+    DateTime? to,
+    int? limit) =>
+{
+    var q = db.SensorReadings.AsQueryable();
+    if (deviceId is not null) q = q.Where(r => r.DeviceId == deviceId);
+    if (metric   is not null) q = q.Where(r => r.Metric == metric);
+    if (from     is not null) q = q.Where(r => r.Timestamp >= from.Value);
+    if (to       is not null) q = q.Where(r => r.Timestamp <= to.Value);
+
+    var results = await q
+        .OrderByDescending(r => r.Timestamp)
+        .Take(limit ?? 500)
+        .ToListAsync();
+
+    return Results.Ok(results);
+});
+
+// Lista dispositivi e metriche disponibili
+app.MapGet("/api/sensors/devices", async (CasaTimoDbContext db) =>
+{
+    var devices = await db.SensorReadings
+        .GroupBy(r => new { r.DeviceId, r.Metric })
+        .Select(g => new
+        {
+            g.Key.DeviceId,
+            g.Key.Metric,
+            Count    = g.Count(),
+            LastSeen = g.Max(r => r.Timestamp)
+        })
+        .OrderBy(x => x.DeviceId).ThenBy(x => x.Metric)
+        .ToListAsync();
+
+    return Results.Ok(devices);
+});
+
 // ── Connectors ───────────────────────────────────────────────────────────────
 app.MapGet("/api/connectors", async (CasaTimoDbContext db) =>
     Results.Ok(await db.ConnectorConfigs.ToListAsync()));

@@ -17,6 +17,8 @@ public class MqttClientService : IHostedService, IDisposable
 
     public event Func<string, string, Task>? MessageReceived;
 
+    public bool IsConnected => _client?.IsConnected ?? false;
+
     public MqttClientService(IConfiguration configuration, ILogger<MqttClientService> logger)
     {
         _configuration = configuration;
