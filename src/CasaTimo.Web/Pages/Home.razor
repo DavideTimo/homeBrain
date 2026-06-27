@@ -19,7 +19,7 @@
                     <h6 class="card-title mb-0">Fotovoltaico</h6>
                 </div>
                 <p class="card-text text-muted small">Produzione FV, batteria e scambi con la rete.</p>
-                <span class="badge bg-secondary">In arrivo — Step 5</span>
+                <span class="badge bg-warning text-dark">In attesa IP inverter (Modbus locale)</span>
             </div>
         </div>
     </div>
@@ -31,7 +31,7 @@
                     <h6 class="card-title mb-0">Pompa di calore</h6>
                 </div>
                 <p class="card-text text-muted small">Temperature, modalità operativa e COP.</p>
-                <span class="badge bg-warning text-dark">Connettore in corso — Step 4</span>
+                <a href="/impianti" class="badge bg-success text-decoration-none">Attivo →</a>
             </div>
         </div>
     </div>
@@ -71,7 +71,7 @@
                     <span class="badge bg-success">Online</span>
                 </li>
                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                    MQTT Broker
+                    MQTT Broker (embedded)
                     <span class="badge bg-success">Online</span>
                 </li>
                 <li class="list-group-item d-flex justify-content-between align-items-center">
@@ -79,8 +79,8 @@
                     <span class="badge bg-success">Attivo</span>
                 </li>
                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                    Viessmann Connector
-                    <span class="badge bg-warning text-dark">Da configurare</span>
+                    Viessmann sidecar
+                    <span class="badge bg-success">Attivo</span>
                 </li>
             </ul>
         </div>
@@ -89,12 +89,12 @@
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-transparent fw-semibold">Roadmap</div>
             <ul class="list-group list-group-flush small">
-                <li class="list-group-item">✅ Step 1–3 — Scaffolding, modelli, MQTT</li>
-                <li class="list-group-item">✅ Step 6 — HistoryRecorder</li>
-                <li class="list-group-item">🔄 Step 4 — Connettore Viessmann</li>
-                <li class="list-group-item text-muted">⬜ Step 5 — Huawei FusionSolar</li>
+                <li class="list-group-item">✅ Step 1–3 — Scaffolding, modelli, MQTT embedded</li>
+                <li class="list-group-item">✅ Step 4 — Sidecar Viessmann (PDC)</li>
+                <li class="list-group-item">✅ Step 6 — HistoryRecorder → SQLite</li>
+                <li class="list-group-item">🔄 Step 5 — Huawei (in attesa IP Modbus locale)</li>
                 <li class="list-group-item text-muted">⬜ Step 7 — BillWatcher (Gmail)</li>
-                <li class="list-group-item text-muted">⬜ Step 9 — Dashboard real-time</li>
+                <li class="list-group-item">✅ Step 9 — Dashboard impianti</li>
             </ul>
         </div>
     </div>
