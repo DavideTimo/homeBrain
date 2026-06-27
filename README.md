@@ -27,6 +27,7 @@ Sviluppo di una **web app domestica unificata** in C# / Blazor che:
 | Fotovoltaico + Batteria | Huawei + LUNA 2000 (20 kWh) | Huawei FusionSolar API |
 | Clima | Daikin 5MXM 90N multisplit | Daikin Cloud API |
 | Wallbox | Gewiss GWJ3002A 7kW | OCPP |
+| Telecamere | Reolink (da acquistare, max 6) | RTSP/ONVIF — 1-2 esterne PoE, 3-4 interne WiFi |
 | VMC | Viessmann Vitovent 100-D | Viessmann API |
 | Email bollette | Gmail | Gmail API (OAuth2) |
 
@@ -301,6 +302,80 @@ WS   /ws/live    (SignalR real-time)
 
 ---
 
+### STEP 13 — Videosorveglianza con AI leggera ⬜ Da fare
+
+**Hardware previsto:** 1-2 telecamere esterne + 3-4 interne, max 6 totali.
+
+**Requisiti hardware telecamere:**
+- Protocollo **RTSP nativo** (ONVIF compatibile) — necessario per OpenCV
+- Evitare telecamere cloud-only (Tuya, Wyze senza hack, ecc.)
+- **Consigliato: Reolink**
+  - Interno: E1 Pro o E1 Outdoor (WiFi 2K, ~35€)
+  - Esterno: RLC-510A o RLC-810A (PoE, IP66, un cavo per dati + alimentazione)
+  - Per le esterne preferire PoE: serve uno switch PoE (~30€)
+- Risoluzione ottimale per l'AI: **1080p/2K** (il modello YOLO ridimensiona a 640×640 internamente, il 4K spreca CPU senza migliorare l'accuracy)
+
+**Architettura:**
+```
+Telecamere (RTSP)
+      │
+      ▼
+sidecar-camera/ (Python, una istanza per telecamera o multi-camera)
+  ├── OpenCV → cattura frame via RTSP
+  ├── Frame delta leggero → motion trigger (CPU quasi zero)
+  ├── YOLOv8n ONNX → inferenza su frame con motion (~10-15 FPS su CPU mini PC)
+  ├── Salva JPEG su NAS a 2 FPS durante motion event
+  └── Pubblica MQTT:
+        casatimo/cameras/{id}/motion   {"active": true/false}
+        casatimo/cameras/{id}/person   {"confidence": 0.87, "count": 1}
+      │
+      ├── FFmpeg → HLS → Blazor (live view, latenza ~3-5s)
+      └── MQTT → HistoryRecorder → SQLite (log eventi)
+```
+
+**AI: YOLOv8 Nano ONNX**
+- Modello pre-addestrato COCO (persone, auto, animali, 80 classi)
+- Dimensione: ~6MB, inference su CPU: ~50-100ms a 640×640
+- Libreria: `onnxruntime` (nessuna dipendenza GPU)
+- Motion detection via frame differencing (leggero, CPU <1%) → trigger per inferenza YOLO
+- YOLO conferma se il motion è causato da persona/veicolo/animale, riducendo falsi positivi
+
+**Registrazione:**
+- Solo su motion event confermato (no registrazione continua)
+- 1 frame ogni 500ms (2 FPS) salvato come JPEG su NAS Synology (`/mnt/nas/casatimo/cameras/{id}/YYYY-MM-DD/`)
+- Retention configurabile (es. 30 giorni, poi auto-delete)
+- Evento loggato su SQLite con timestamp, camera ID, tipo oggetto rilevato, confidence
+
+**Live view in Blazor:**
+- FFmpeg transcoding RTSP → HLS (segmenti .ts ogni 2s)
+- Player HLS nel browser via `hls.js`
+- Latenza attesa: 3-6s (accettabile per sorveglianza)
+- Alternativa futura a bassa latenza: WebRTC (più complesso)
+
+**Topic MQTT:**
+```
+casatimo/cameras/{id}/motion    {"active": true, "timestamp": "..."}
+casatimo/cameras/{id}/person    {"confidence": 0.87, "count": 1, "timestamp": "..."}
+casatimo/cameras/{id}/vehicle   {"confidence": 0.91, "count": 1, "timestamp": "..."}
+casatimo/cameras/{id}/status    {"online": true, "fps": 12.3}
+```
+
+**Variabili `.env` da aggiungere per ogni camera:**
+```
+CAMERA_01_NAME=ingresso
+CAMERA_01_RTSP=rtsp://admin:password@192.168.1.x:554/stream1
+CAMERA_02_NAME=giardino
+CAMERA_02_RTSP=rtsp://admin:password@192.168.1.y:554/stream1
+```
+
+**Note:**
+- Il mini PC (hosting) deve avere CPU sufficiente: ~15% core per camera a 1080p con YOLOv8n
+- Con 5 telecamere stimate: ~75% di un core fisico (dipende dall'hardware)
+- Il NAS DS115j (ARM 32bit, no Docker) viene usato solo come storage SMB montato sul mini PC
+- Implementazione suggerita: una istanza Docker per camera (scalabilità, isolamento crash)
+
+---
+
 ## Note architetturali
 
 ### Sicurezza
@@ -339,6 +414,8 @@ set VIESSMANN_CLIENT_ID=<dal developer portal>
 | FV / Batteria | 5 min (futuro) | ad ogni ricezione MQTT |
 | Wallbox | 1 min quando attiva (futuro) | per sessione |
 | Bollette Gmail | ogni 6 ore (futuro) | al ricevimento |
+| Telecamere — motion check | continuo (frame delta) | solo su evento |
+| Telecamere — AI inferenza | su motion trigger | evento + JPEG su NAS |
 
 ---
 
@@ -351,6 +428,10 @@ set VIESSMANN_CLIENT_ID=<dal developer portal>
 - Google Gmail API .NET: https://developers.google.com/gmail/api/quickstart/dotnet
 - Blazor WASM PWA: https://learn.microsoft.com/en-us/aspnet/core/blazor/progressive-web-app
 - Cloudflare Tunnel: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
+- YOLOv8 Nano ONNX: https://github.com/ultralytics/ultralytics
+- ONNX Runtime Python: https://onnxruntime.ai/docs/get-started/with-python.html
+- Reolink RTSP URL format: `rtsp://{user}:{pass}@{ip}:554/h264Preview_01_main`
+- HLS.js (player browser): https://github.com/video-dev/hls.js/
 
 ---
 
