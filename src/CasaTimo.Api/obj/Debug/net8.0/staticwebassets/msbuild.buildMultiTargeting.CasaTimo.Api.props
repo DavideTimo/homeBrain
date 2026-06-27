@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="..\build\CasaTimo.Api.props" />
-</Project>
