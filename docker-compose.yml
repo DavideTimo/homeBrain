@@ -1,33 +1,34 @@
 services:
 
-  mosquitto:
-    image: eclipse-mosquitto:2.0
-    container_name: casatimo-mosquitto
-    ports:
-      - '1883:1883'
-      - '9001:9001'
-    volumes:
-      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-      - mosquitto_data:/mosquitto/data
-      - mosquitto_log:/mosquitto/log
-    restart: unless-stopped
-
   viessmann-sidecar:
     build: ./sidecar-viessmann
     container_name: casatimo-viessmann
     restart: unless-stopped
-    depends_on:
-      - mosquitto
     volumes:
       - ./sidecar-viessmann/data:/data
     environment:
-      - MQTT_HOST=mosquitto
+      - MQTT_HOST=host.docker.internal
       - MQTT_PORT=1883
       - VIESSMANN_USER=${VIESSMANN_USER}
       - VIESSMANN_PASS=${VIESSMANN_PASS}
       - VIESSMANN_CLIENT_ID=${VIESSMANN_CLIENT_ID:-viessmann.vicare.android}
       - TOKEN_FILE=/data/viessmann_token.json
       - POLL_INTERVAL_SECONDS=${VIESSMANN_POLL_INTERVAL:-300}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  huawei-sidecar:
+    build: ./sidecar-huawei
+    container_name: casatimo-huawei
+    restart: unless-stopped
+    environment:
+      - MQTT_HOST=host.docker.internal
+      - MQTT_PORT=1883
+      - FUSIONSOLAR_USER=${FUSIONSOLAR_USER}
+      - FUSIONSOLAR_SYSCODE=${FUSIONSOLAR_SYSCODE}
+      - POLL_INTERVAL_SECONDS=${HUAWEI_POLL_INTERVAL:-300}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   viessmann-setup:
     build: ./sidecar-viessmann
@@ -43,7 +44,3 @@ services:
     command: python setup_token.py
     profiles:
       - setup
-
-volumes:
-  mosquitto_data:
-  mosquitto_log:

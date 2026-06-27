@@ -5,6 +5,7 @@ using CasaTimo.Infrastructure.Workers;
 using CasaTimo.Workers;
 using Microsoft.EntityFrameworkCore;
 
+
 var builder = Host.CreateApplicationBuilder(args);
 
 // DbContext for HistoryRecorder (scoped, created per message via IServiceScopeFactory)
@@ -14,6 +15,9 @@ builder.Services.AddDbContext<CasaTimoDbContext>(opts =>
 
 // Typed HttpClient for the health-check Worker
 builder.Services.AddHttpClient<Worker>(c => c.BaseAddress = new Uri("http://localhost:5233"));
+
+// Broker embedded: deve partire prima del client
+builder.Services.AddHostedService<MqttBrokerService>();
 
 // Register MqttClientService as singleton so HistoryRecorder can inject it
 builder.Services.AddSingleton<MqttClientService>();

@@ -40,7 +40,7 @@ Sviluppo di una **web app domestica unificata** in C# / Blazor che:
 | API | ASP.NET Core Minimal API | REST + JWT auth |
 | Worker services | C# Background Services | Connettori e BillWatcher |
 | Sidecar Viessmann | Python 3.12 + requests | Polling PDC → MQTT (headless PKCE) |
-| Message broker | Mosquitto 2.0 (Docker) | Bus condiviso sensori |
+| Message broker | MQTTnet embedded (.NET) | Broker in-process nel Workers, porta 1883 |
 | Database | SQLite condiviso (`data/casatimo.db`) | EF Core, unico file per API + Workers |
 | Storage PDF | NAS Synology | Cartelle per anno/tipo |
 | Hosting | Mini PC locale | Docker Compose |
@@ -58,14 +58,16 @@ homeBrain/
 ├── .env                              # secrets reali (NON committare)
 ├── data/
 │   └── casatimo.db                   # SQLite condiviso API + Workers
-├── mosquitto/
-│   └── config/mosquitto.conf         # listener 1883, allow_anonymous true
 ├── sidecar-viessmann/                # sidecar Python Vitocal 222-S
 │   ├── main.py                       # polling loop → MQTT
 │   ├── setup_token.py                # autenticazione one-time (PKCE)
 │   ├── requirements.txt
 │   ├── Dockerfile
 │   └── data/viessmann_token.json     # token OAuth2 (NON committare)
+├── sidecar-huawei/                   # sidecar Python inverter Huawei
+│   ├── main.py                       # polling Modbus TCP locale → MQTT
+│   ├── requirements.txt
+│   └── Dockerfile
 │
 └── src/
     ├── CasaTimo.Web/                 # Blazor WebAssembly (frontend)
@@ -84,7 +86,7 @@ homeBrain/
 [Vitocal 222-S]
       │ API REST Viessmann (PKCE OAuth2)
       ▼
-[sidecar-viessmann Python]  ──→  [MQTT Broker — Mosquitto :1883]
+[sidecar-viessmann Python]  ──→  [MQTT Broker — MQTTnet embedded :1883]
                                           │
                               ┌───────────┤
                               │           │
@@ -112,26 +114,18 @@ homeBrain/
 ## Avvio in sviluppo
 
 ```bash
-# 1. Broker MQTT
-docker-compose up -d mosquitto
-
-# 2. API backend (terminale 1)
-dotnet run --project src/CasaTimo.Api
-
-# 3. Workers / HistoryRecorder (terminale 2)
+# 1. Workers (avvia anche il broker MQTT embedded su :1883)
 dotnet run --project src/CasaTimo.Workers
 
-# 4. Frontend Blazor (terminale 3)
+# 2. API backend (terminale 2)
+dotnet run --project src/CasaTimo.Api
+
+# 3. Frontend Blazor (terminale 3)
 dotnet run --project src/CasaTimo.Web
 
-# 5. Sidecar Viessmann — setup one-time (solo la prima volta)
-cd sidecar-viessmann
-python setup_token.py        # salva data/viessmann_token.json
-
-# 5b. Sidecar Viessmann — polling continuo (terminale 4)
-set VIESSMANN_USER=davide.timo1982@libero.it
-set VIESSMANN_CLIENT_ID=ff9de13f959927123b166ccfea88c624
-python main.py
+# 4. Sidecar Docker (si connettono al broker sul host via host.docker.internal:1883)
+docker compose up viessmann-sidecar
+docker compose up huawei-sidecar        # quando disponibile
 ```
 
 ---
@@ -159,7 +153,8 @@ DB condiviso tra API e Workers: `data/casatimo.db` (percorso `../../data/casatim
 
 ### STEP 3 — MQTT infrastructure ✅ Completato
 `MqttClientService` (MQTTnet) registrato come singleton con `MessageReceived` event per i consumer interni.  
-Mosquitto configurato con `mosquitto/config/mosquitto.conf` (listener 1883, allow_anonymous true).
+`MqttBrokerService` (MQTTnet Server embedded) avviato come `IHostedService` nel Workers, porta 1883.  
+I sidecar Docker si connettono tramite `host.docker.internal:1883`.
 
 **Topic conventions:**
 ```
@@ -191,15 +186,43 @@ Sidecar Python indipendente che bypassa PyViCare e accede direttamente alle API 
 - `iam.viessmann.com` è deprecato — usare `iam.viessmann-climatesolutions.com`
 - Scope `IoT offline_access` (non `IoT User` che dà 400)
 - Il C# `ViessmannConnector` in Workers rimane come scaffold per futura integrazione
+- **Non esiste alternativa locale:** il modulo ViCare comunica solo via cloud Viessmann. Optolink (seriale) e CAN bus (progetto `open3e`) richiedono hardware aggiuntivo e non sono supportati sulla Vitocal 222-S.
 
 ---
 
-### STEP 5 — Connettore Huawei FusionSolar ⬜ Da fare
+### STEP 5 — Connettore Huawei FusionSolar ✅ Completato (sidecar Python)
 
-**Dati da leggere:** produzione FV istantanea, energia oggi, SOC batteria, potenza batteria, export rete, autoconsumo.
+Sidecar Python `sidecar-huawei/` che autentica sulla northbound API FusionSolar e pubblica su MQTT.
 
-**Prompt suggerito:**
-> "Crea un sidecar Python `sidecar-huawei/main.py` seguendo il pattern di `sidecar-viessmann`. Autentica su `eu5.fusionsolar.huawei.com` con username/password (gestisci il cookie di sessione). Legge `/thirdData/getStationRealKpi` e pubblica su casatimo/fv/*."
+**Autenticazione:** POST `/thirdData/login` con `userName` + `systemCode` (cookie di sessione `roarand`). Re-login automatico su failCode 401.
+
+**Discovery on startup:** `getStationList` → stationCode, `getDevList` → device ID per tipo (inverter=1, batteria=39, meter=47).
+
+**Poll loop (default 300s):**
+- `getStationRealKpi` → `energy_today`
+- `getDevRealKpi` inverter → `power_active`, `load_power`
+- `getDevRealKpi` batteria → `battery_soc`, `battery_power`
+- `getDevRealKpi` grid meter → `grid_power`
+
+**Topic MQTT:**
+```
+casatimo/fv/power_active     kW   produzione FV istantanea
+casatimo/fv/energy_today     kWh  energia prodotta oggi
+casatimo/fv/battery_soc      %    SOC batteria LUNA 2000
+casatimo/fv/battery_power    kW   potenza batteria (+ carica, - scarica)
+casatimo/fv/grid_power       kW   potenza rete (+ export, - import)
+casatimo/fv/load_power       kW   consumo casa istantaneo
+```
+
+**Approccio: Modbus TCP locale** (non cloud API)
+- L'API northbound FusionSolar richiede un account installer — non disponibile per utenti finali
+- Alternativa: `python-huawei-solar` si connette direttamente all'inverter sulla LAN via Modbus TCP (porta 6607), senza cloud né credenziali speciali
+- Prerequisiti: IP dell'inverter sulla rete locale + Modbus TCP abilitato dall'app FusionSolar (`Dispositivi` → `Impostazioni` → `Configurazione comunicazione`)
+- Dati ogni 30s invece di 300s (nessun rate limit cloud)
+
+**Credenziali richieste in `.env`:**
+- `HUAWEI_INVERTER_HOST` — IP locale dell'inverter (es. `192.168.1.100`)
+- `HUAWEI_INVERTER_PORT` — porta Modbus (default `6607`)
 
 ---
 
@@ -284,7 +307,7 @@ WS   /ws/live    (SignalR real-time)
 - Tutti i secret in `.env` (mai nel codice) — vedi `.env.example`
 - JWT Bearer auth su endpoint di scrittura
 - `sidecar-viessmann/data/viessmann_token.json` escluso da git (`.gitignore`)
-- Mosquitto: `allow_anonymous true` solo in sviluppo — aggiungere autenticazione in produzione
+- Broker MQTT embedded: nessuna auth in sviluppo — aggiungere `WithDefaultEndpointCredentials` in produzione
 - CORS ristretto a `AllowedOrigins` in `appsettings.json`
 
 ### Configurazione credenziali
@@ -325,7 +348,6 @@ set VIESSMANN_CLIENT_ID=<dal developer portal>
 - Viessmann API base: `https://api.viessmann-climatesolutions.com/iot/v2`
 - Huawei FusionSolar API: https://eu5.fusionsolar.huawei.com/unisso/login
 - MQTTnet (C#): https://github.com/dotnet/MQTTnet
-- Mosquitto Docker: https://hub.docker.com/_/eclipse-mosquitto
 - Google Gmail API .NET: https://developers.google.com/gmail/api/quickstart/dotnet
 - Blazor WASM PWA: https://learn.microsoft.com/en-us/aspnet/core/blazor/progressive-web-app
 - Cloudflare Tunnel: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
