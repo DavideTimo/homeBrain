@@ -17,6 +17,8 @@ Sviluppo di una **web app domestica unificata** in C# / Blazor che:
 
 **Filosofia:** sensori come risorse condivise tra servizi indipendenti (sensor fusion), architettura espandibile nel tempo (telecamere AI, nuovi sensori, attuatori).
 
+> **Nota — due modelli di condivisione diversi.** Per i sensori a valore singolo (temperature, potenze, SOC batteria, ecc.) la condivisione è gratuita: la fonte pubblica una volta su MQTT e un numero qualsiasi di servizi si abbona allo stesso topic senza costo aggiuntivo (fan-out). Per le **telecamere** non vale lo stesso: il flusso video è dati binari continui ad alto bitrate, che MQTT non può trasportare — ogni servizio che ha bisogno dei frame (pipeline AI di sorveglianza, live view HLS, un eventuale futuro consumer) deve aprire una **propria connessione diretta** (RTSP o snapshot HTTP) alla telecamera. Qui il costo cresce con il numero di consumatori, ed è limitato dal numero massimo di stream RTSP concorrenti supportati dalla camera — non è un sensore "condiviso via software" ma una risorsa fisica condivisa a livello di rete. Vedi STEP 13 e STEP 14 per il dettaglio.
+
 ---
 
 ## Impianti e dispositivi presenti
@@ -394,6 +396,32 @@ CAMERA_02_RTSP=rtsp://admin:password@192.168.1.y:554/stream1
 - Con 5 telecamere stimate: ~75% di un core fisico (dipende dall'hardware)
 - Il NAS DS115j (ARM 32bit, no Docker) viene usato solo come storage SMB montato sul mini PC
 - Deployment: un solo processo/container `CasaTimo.Camera`, un loop async per camera configurata — più semplice da gestire di un container per camera, a scapito dell'isolamento in caso di crash di una singola camera
+
+---
+
+### STEP 14 — Valutazione altezza erba giardino ⬜ Da fare (metodo da decidere)
+
+Riusa la camera esterna già prevista per la videosorveglianza (STEP 13), ma **non** tramite la pipeline AI in tempo reale: essendo la crescita dell'erba un fenomeno lento (giorni, non secondi), basta uno **snapshot HTTP periodico** (es. ogni 1-6 ore) invece di una connessione RTSP persistente — la maggior parte delle IP cam (incluse le Reolink) espone un endpoint HTTP separato per un singolo JPEG on-demand (es. `/cgi-bin/api.cgi?cmd=Snap` su Reolink). Questo non compete con gli stream RTSP persistenti di STEP 13 e non richiede requisiti hardware aggiuntivi.
+
+**Deployment:** un `BackgroundService` in `CasaTimo.Workers` (non in `CasaTimo.Camera`) — servizio indipendente dalla sorveglianza, stesso pattern degli altri worker.
+
+**Metodo di misura — due opzioni, da scegliere:**
+
+1. **Marker graduato in prato (più affidabile, richiede setup fisico)** — un paletto/righello a bande colorate piantato fisso nel prato, nell'inquadratura della camera. Ad ogni snapshot: individua il marker via color segmentation, trova il punto in cui l'erba lo occlude, converte la distanza in pixel in cm usando la scala nota del marker. Tecnica robusta alla luce (confronta due colori nello stesso frame), ma richiede di piantare e mantenere fisicamente il marker (non spostarlo, non farlo urtare dal tosaerba).
+2. **Indice di verde relativo, senza marker (setup zero, meno preciso)** — confronta ogni snapshot con una baseline scattata subito dopo un taglio, calcolando un indice di vegetazione (es. Excess Green Index) su una porzione fissa di prato. Non dà un'altezza in cm, solo un trend → oltre una soglia empirica scatta "serve tagliare". Molto sensibile a luce/ombre/rugiada, andrebbe normalizzato rispetto a una zona di riferimento non-erba nello stesso frame, e ricalibrato dopo ogni taglio.
+
+**Vincoli comuni a entrambe le opzioni:**
+- Inquadratura fissa: se la camera si sposta anche di poco la calibrazione salta
+- Standardizzare l'orario dello snapshot (es. sempre alle 12:00 solari) per ridurre la variabilità delle ombre
+- La camera esterna scelta deve inquadrare il prato e supportare l'endpoint di snapshot HTTP (da verificare sul modello specifico)
+
+**Topic MQTT (indicativo, dipende dal metodo scelto):**
+```
+casatimo/garden/grass_height    cm    (opzione marker)
+casatimo/garden/needs_mowing    bool  (opzione indice verde)
+```
+
+**Nota sul modello dati:** il risultato può alimentare `HistoryRecorder` → SQLite come un sensore qualsiasi. Un eventuale promemoria "serve tagliare" non può riusare `Reminder` così com'è, perché oggi è legato a `Bill` (`Reminder.BillId`) — andrebbe generalizzato per notifiche non collegate a una bolletta.
 
 ---
 
