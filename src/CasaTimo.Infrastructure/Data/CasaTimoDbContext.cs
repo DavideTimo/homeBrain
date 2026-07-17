@@ -15,12 +15,14 @@ public class CasaTimoDbContext : DbContext
     public DbSet<Reminder> Reminders { get; set; }
     public DbSet<MaintenanceRecord> MaintenanceRecords { get; set; }
     public DbSet<CasaTimo.Core.Models.ConnectorConfig> ConnectorConfigs { get; set; }
+    public DbSet<Camera> Cameras { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.Entity<Device>().HasKey(d => d.Id);
+        modelBuilder.Entity<Camera>().HasKey(c => c.Id);
 
         modelBuilder.Entity<SensorReading>().HasKey(r => r.Id);
         modelBuilder.Entity<SensorReading>()

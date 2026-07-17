@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -174,7 +175,167 @@ app.MapPut("/api/connectors/{name}", async (string name, HttpRequest request, Ca
     return Results.Ok(cfg);
 }).RequireAuthorization();
 
+// ── Cameras ──────────────────────────────────────────────────────────────────
+static CameraDto ToCameraDto(Camera c) => new(
+    c.Id, c.Name, c.Location, c.Host, c.RtspPort, c.RtspPath, c.RtspSubPath,
+    c.Username, !string.IsNullOrEmpty(c.Password), c.Enabled, c.CreatedAt, c.UpdatedAt);
+
+app.MapGet("/api/cameras", async (CasaTimoDbContext db) =>
+    Results.Ok((await db.Cameras.OrderBy(c => c.Name).ToListAsync()).Select(ToCameraDto)));
+
+app.MapGet("/api/cameras/{id}", async (string id, CasaTimoDbContext db) =>
+{
+    var cam = await db.Cameras.FindAsync(id);
+    return cam is null ? Results.NotFound() : Results.Ok(ToCameraDto(cam));
+});
+
+app.MapPost("/api/cameras", async (CameraWriteRequest req, CasaTimoDbContext db) =>
+{
+    if (string.IsNullOrWhiteSpace(req.Name) || string.IsNullOrWhiteSpace(req.Host))
+        return Results.BadRequest("Name e Host sono obbligatori");
+
+    var cam = new Camera
+    {
+        Name = req.Name,
+        Location = string.IsNullOrWhiteSpace(req.Location) ? "interna" : req.Location,
+        Host = req.Host,
+        RtspPort = req.RtspPort > 0 ? req.RtspPort : 554,
+        RtspPath = string.IsNullOrWhiteSpace(req.RtspPath) ? "/h264Preview_01_main" : req.RtspPath,
+        RtspSubPath = req.RtspSubPath,
+        Username = req.Username,
+        Password = req.Password,
+        Enabled = req.Enabled,
+    };
+    db.Cameras.Add(cam);
+    await db.SaveChangesAsync();
+    return Results.Created($"/api/cameras/{cam.Id}", ToCameraDto(cam));
+}).RequireAuthorization();
+
+app.MapPut("/api/cameras/{id}", async (string id, CameraWriteRequest req, CasaTimoDbContext db) =>
+{
+    if (string.IsNullOrWhiteSpace(req.Name) || string.IsNullOrWhiteSpace(req.Host))
+        return Results.BadRequest("Name e Host sono obbligatori");
+
+    var cam = await db.Cameras.FindAsync(id);
+    if (cam is null) return Results.NotFound();
+
+    cam.Name = req.Name;
+    cam.Location = string.IsNullOrWhiteSpace(req.Location) ? "interna" : req.Location;
+    cam.Host = req.Host;
+    cam.RtspPort = req.RtspPort > 0 ? req.RtspPort : 554;
+    cam.RtspPath = string.IsNullOrWhiteSpace(req.RtspPath) ? "/h264Preview_01_main" : req.RtspPath;
+    cam.RtspSubPath = req.RtspSubPath;
+    cam.Username = req.Username;
+    // Aggiorna la password solo se il client ne invia una nuova, per non
+    // costringere il frontend a rimandare quella esistente ad ogni salvataggio
+    if (!string.IsNullOrEmpty(req.Password)) cam.Password = req.Password;
+    cam.Enabled = req.Enabled;
+    cam.UpdatedAt = DateTime.UtcNow;
+
+    await db.SaveChangesAsync();
+    return Results.Ok(ToCameraDto(cam));
+}).RequireAuthorization();
+
+app.MapDelete("/api/cameras/{id}", async (string id, CasaTimoDbContext db) =>
+{
+    var cam = await db.Cameras.FindAsync(id);
+    if (cam is null) return Results.NotFound();
+    db.Cameras.Remove(cam);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
+}).RequireAuthorization();
+
+// Cattura un singolo frame via ffmpeg per validare host/credenziali di una camera,
+// senza doverla prima salvare. Richiede ffmpeg installato sull'host che esegue l'API.
+app.MapPost("/api/cameras/test", async (CameraTestRequest req) =>
+{
+    var userInfo = string.IsNullOrEmpty(req.Username)
+        ? ""
+        : $"{Uri.EscapeDataString(req.Username)}:{Uri.EscapeDataString(req.Password ?? "")}@";
+    var rawPath = string.IsNullOrWhiteSpace(req.RtspPath) ? "/" : req.RtspPath;
+    var path = rawPath.StartsWith('/') ? rawPath : $"/{rawPath}";
+    var rtspUrl = $"rtsp://{userInfo}{req.Host}:{req.RtspPort}{path}";
+
+    var sw = Stopwatch.StartNew();
+    Process? proc = null;
+    try
+    {
+        proc = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = "ffmpeg",
+                ArgumentList =
+                {
+                    "-y", "-rtsp_transport", "tcp",
+                    "-i", rtspUrl,
+                    "-frames:v", "1",
+                    "-f", "image2", "-vcodec", "mjpeg",
+                    "pipe:1"
+                },
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            }
+        };
+        proc.Start();
+
+        var stdout = new MemoryStream();
+        var stdoutTask = proc.StandardOutput.BaseStream.CopyToAsync(stdout);
+        var stderrTask = proc.StandardError.ReadToEndAsync();
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        try
+        {
+            await proc.WaitForExitAsync(cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            try { proc.Kill(true); } catch { }
+            return Results.Ok(new CameraTestResult(false,
+                "Timeout — nessuna risposta dalla telecamera entro 10s", null, sw.ElapsedMilliseconds));
+        }
+
+        await stdoutTask;
+        var jpegBytes = stdout.ToArray();
+
+        if (proc.ExitCode != 0 || jpegBytes.Length == 0)
+        {
+            var stderr = await stderrTask;
+            var errLine = stderr.Split('\n').LastOrDefault(l => !string.IsNullOrWhiteSpace(l))?.Trim()
+                          ?? "errore sconosciuto";
+            return Results.Ok(new CameraTestResult(false, errLine, null, sw.ElapsedMilliseconds));
+        }
+
+        return Results.Ok(new CameraTestResult(true, null, Convert.ToBase64String(jpegBytes), sw.ElapsedMilliseconds));
+    }
+    catch (System.ComponentModel.Win32Exception)
+    {
+        return Results.Ok(new CameraTestResult(false,
+            "ffmpeg non trovato sul sistema — installalo per usare la diagnostica", null, sw.ElapsedMilliseconds));
+    }
+    finally
+    {
+        proc?.Dispose();
+    }
+}).RequireAuthorization();
+
 app.Run();
 
 public record LoginRequest(string Password);
+
+public record CameraDto(
+    string Id, string Name, string Location, string Host, int RtspPort,
+    string RtspPath, string? RtspSubPath, string? Username, bool HasPassword,
+    bool Enabled, DateTime CreatedAt, DateTime UpdatedAt);
+
+public record CameraWriteRequest(
+    string Name, string Location, string Host, int RtspPort,
+    string RtspPath, string? RtspSubPath, string? Username, string? Password, bool Enabled);
+
+public record CameraTestRequest(
+    string Host, int RtspPort, string RtspPath, string? Username, string? Password);
+
+public record CameraTestResult(bool Success, string? Error, string? PreviewBase64, long ElapsedMs);
+
 public partial class Program { } // required for WebApplicationFactory in tests
