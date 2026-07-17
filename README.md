@@ -337,40 +337,34 @@ POST   /api/cameras/test       cattura un frame via ffmpeg per validare host/cre
 
 **Nota operativa:** il progetto usa `EnsureCreated()` invece delle migrazioni EF Core — su un database `data/casatimo.db` già esistente (creato prima di questa modifica) la nuova tabella `Cameras` **non** viene aggiunta automaticamente. Su un DB esistente serve creare la tabella manualmente, oppure ripartire da un DB vuoto in sviluppo.
 
-#### Pipeline AI ⬜ Da fare — tentativo "homemade", senza OpenCvSharp
+#### Pipeline AI ⬜ Da fare — con OpenCvSharp
 
-Decisione presa: **niente OpenCvSharp** (dipendenza nativa ~100-150MB + libreria enorme per quello che serve). Si tenta prima un'implementazione interamente C#/.NET, usando solo `ffmpeg` come processo esterno (già necessario comunque per la live view HLS) e nessun'altra libreria di computer vision nativa. Se l'esperimento non regge (qualità/CPU insufficiente), resta aperta la possibilità di appoggiarsi a OpenCV in futuro.
+Decisione (rivista): **si usa OpenCvSharp**, non un'implementazione homemade. Motivo principale: qui non è possibile compilare/eseguire il codice per validarlo iterativamente — affidarsi ad algoritmi collaudati (MOG2, CSRT) riduce di molto il rischio di bug sottili rispetto a motion detection/tracking scritti a mano e mai eseguiti. Il costo è la dipendenza nativa (~100-150MB nell'immagine Docker), accettato.
+
+**Prima dell'implementazione in `CasaTimo.Camera`: prototipazione in un repository separato**, per validare l'algoritmo (qualità del motion filter, robustezza del tracker, CPU reale sul mini PC) senza sporcare la history di `homeBrain` con tentativi — dettagli del repo di prototipazione ancora da definire.
 
 ```
-Telecamere (RTSP — connessioni indipendenti per camera)
+Telecamere (RTSP — 2 connessioni indipendenti per camera)
       │
       ├──────────────────────────────┐
       ▼                               ▼
 [Pipeline AI, per camera]        [Live view]
 CasaTimo.Camera (Worker Service)  FFmpeg → HLS (.ts/.m3u8)
-  ├── ffmpeg (processo esterno)        │
-  │   decodifica + resize + fps        ▼
-  │   ridotto → frame raw BGR24   Blazor + hls.js
-  │   via pipe stdout             (live view, latenza ~3-5s)
-  ├── Motion detection homemade:
-  │   background model per-pixel
-  │   (media mobile) → soglia →
-  │   connected components (scritti
-  │   a mano) → bounding box
-  ├── Crop + resize bilineare
-  │   (scritto a mano) a 640×640
-  │   per le finestre in movimento
+  ├── OpenCvSharp VideoCapture         │
+  │   → cattura frame via RTSP         ▼
+  ├── Motion filter (MOG2,       Blazor + hls.js
+  │   OpenCvSharp) → bounding    (live view, latenza ~3-5s)
+  │   box delle regioni cambiate
+  ├── Crop finestre in movimento
   │   non già coperte da un track
   ├── YOLOv8n ONNX (Microsoft.ML.OnnxRuntime)
   │   → inferenza solo sulle finestre
-  ├── "Tracking": invece di un vero
-  │   tracker visivo (CSRT/KCF),
-  │   ri-verifica via YOLO l'ultima
-  │   bbox nota ad ogni ciclo — più
-  │   YOLO, meno codice, da misurare
-  ├── Track perso (N miss consecutivi
-  │   di YOLO sulla regione) → chiude
-  │   l'evento
+  ├── Match detection↔track esistenti (IoU)
+  │   → nuovo track (CSRT) o aggiorna esistente
+  ├── CSRT tracker.Update() ogni frame
+  │   tra un'inferenza YOLO e l'altra
+  ├── Track perso (N miss consecutivi)
+  │   → chiude l'evento
   ├── Salva JPEG su NAS a 2 FPS durante il track attivo
   └── Pubblica MQTT (solo eventi, mai i frame):
         casatimo/cameras/{id}/motion   {"active": true/false}
@@ -383,12 +377,10 @@ CasaTimo.Camera (Worker Service)  FFmpeg → HLS (.ts/.m3u8)
 
 **Nota:** MQTT trasporta solo i JSON di evento (motion/person/vehicle/status), mai il flusso video: non è adatto a streaming continuo ad alto bitrate. La pipeline AI e la live view HLS si collegano entrambe direttamente alla telecamera via RTSP, indipendentemente l'una dall'altra.
 
-**Cosa resta scritto a mano in C#, nel dettaglio:**
-- Lettura frame: `ffmpeg` con `-f rawvideo -pix_fmt bgr24` su stdout, letti in chunk di dimensione fissa (width×height×3) — nessuna libreria di decodifica video in C#
-- Motion detection: modello di background a media mobile esponenziale per pixel (`bg[i] = bg[i]*(1-α) + pixel[i]*α`), differenza assoluta, soglia, poi connected components (flood fill/union-find) per raggruppare i pixel cambiati in bounding box — algoritmi noti, implementazione diretta senza libreria
-- Resize per il crop da passare a YOLO: interpolazione bilineare scritta a mano sul buffer raw, nessuna libreria immagini
-- Salvataggio JPEG: delegato a `ffmpeg` (unico punto dove non si scrive un encoder a mano — scrivere un encoder JPEG da zero non è proporzionato al progetto)
-- Tracking: nessun algoritmo di tracking visivo vero e proprio (niente CSRT/KCF/optical flow) — si ri-esegue YOLO sull'ultima bbox nota, approccio più semplice da implementare ma potenzialmente più costoso in CPU, da validare quando la pipeline sarà testabile
+**Motion detection + tracking: `OpenCvSharp`**
+- Motion filter: background subtractor **MOG2** (più robusto a ombre/variazioni di luce del semplice frame diff, comunque leggero)
+- Tracker per-oggetto confermato da YOLO: **CSRT** — segue l'oggetto frame per frame senza richiamare YOLO, il track viene rimosso solo quando il tracker lo perde (N miss consecutivi)
+- Nessuna implementazione homemade per ora — resta un'opzione futura se la dipendenza nativa dovesse diventare un problema (es. porting su hardware ARM), non prioritaria
 
 **AI: YOLOv8 Nano ONNX**
 - Modello pre-addestrato COCO (persone, auto, animali, 80 classi)
@@ -420,7 +412,7 @@ casatimo/cameras/{id}/online    0/1, riusa SensorReading (deviceId=camera_{id})
 
 **Note:**
 - Il mini PC (hosting) deve avere CPU sufficiente: ~15% core per camera a 1080p con YOLOv8n
-- Con 5 telecamere stimate: ~75% di un core fisico (dipende dall'hardware) — da rivedere una volta misurato il costo reale dell'approccio "ri-verifica via YOLO" al posto di un tracker vero
+- Con 5 telecamere stimate: ~75% di un core fisico (dipende dall'hardware)
 - Il NAS DS115j (ARM 32bit, no Docker) viene usato solo come storage SMB montato sul mini PC
 - Deployment: un solo processo/container `CasaTimo.Camera`, un loop async per camera configurata (letta da `/api/cameras`, non da `.env`) — più semplice da gestire di un container per camera, a scapito dell'isolamento in caso di crash di una singola camera
 
