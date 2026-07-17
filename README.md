@@ -305,7 +305,9 @@ WS   /ws/live    (SignalR real-time)
 **Hardware previsto:** 1-2 telecamere esterne + 3-4 interne, max 6 totali.
 
 **Requisiti hardware telecamere:**
-- Protocollo **RTSP nativo** (ONVIF compatibile) — necessario per OpenCV
+- Protocollo **RTSP nativo** (ONVIF compatibile)
+- **Almeno 2 stream RTSP concorrenti supportati** — la pipeline AI e la live view HLS aprono ciascuna una propria connessione RTSP indipendente verso la stessa camera (vedi sotto), quindi verificare per ogni modello il numero massimo di client RTSP simultanei prima dell'acquisto
+- Se disponibile un "sub stream" a bassa risoluzione (es. 640×360) separato dal main stream, va usato per la pipeline AI — riduce CPU di decodifica/motion, tanto YOLO ridimensiona comunque a 640×640 internamente
 - Evitare telecamere cloud-only (Tuya, Wyze senza hack, ecc.)
 - **Consigliato: Reolink**
   - Interno: E1 Pro o E1 Outdoor (WiFi 2K, ~35€)
@@ -313,39 +315,60 @@ WS   /ws/live    (SignalR real-time)
   - Per le esterne preferire PoE: serve uno switch PoE (~30€)
 - Risoluzione ottimale per l'AI: **1080p/2K** (il modello YOLO ridimensiona a 640×640 internamente, il 4K spreca CPU senza migliorare l'accuracy)
 
-**Architettura:**
+**Architettura — tutto in C#/.NET, un solo processo Worker per tutte le camere:**
 ```
-Telecamere (RTSP)
+Telecamere (RTSP — 2 connessioni indipendenti per camera)
       │
-      ▼
-sidecar-camera/ (Python, una istanza per telecamera o multi-camera)
-  ├── OpenCV → cattura frame via RTSP
-  ├── Frame delta leggero → motion trigger (CPU quasi zero)
-  ├── YOLOv8n ONNX → inferenza su frame con motion (~10-15 FPS su CPU mini PC)
-  ├── Salva JPEG su NAS a 2 FPS durante motion event
-  └── Pubblica MQTT:
+      ├──────────────────────────────┐
+      ▼                               ▼
+[Pipeline AI, per camera]        [Live view]
+CasaTimo.Camera (Worker Service)  FFmpeg → HLS (.ts/.m3u8)
+  ├── OpenCvSharp VideoCapture         │
+  │   → cattura frame via RTSP         ▼
+  ├── Motion filter (MOG2,       Blazor + hls.js
+  │   OpenCvSharp) → bounding    (live view, latenza ~3-5s)
+  │   box delle regioni cambiate
+  ├── Crop finestre in movimento
+  │   non già coperte da un track
+  ├── YOLOv8n ONNX (Microsoft.ML.OnnxRuntime)
+  │   → inferenza solo sulle finestre
+  ├── Match detection↔track esistenti (IoU)
+  │   → nuovo track (CSRT) o aggiorna esistente
+  ├── CSRT tracker.Update() ogni frame
+  │   tra un'inferenza YOLO e l'altra
+  ├── Track perso (N miss consecutivi)
+  │   → chiude l'evento
+  ├── Salva JPEG su NAS a 2 FPS durante il track attivo
+  └── Pubblica MQTT (solo eventi, mai i frame):
         casatimo/cameras/{id}/motion   {"active": true/false}
         casatimo/cameras/{id}/person   {"confidence": 0.87, "count": 1}
-      │
-      ├── FFmpeg → HLS → Blazor (live view, latenza ~3-5s)
-      └── MQTT → HistoryRecorder → SQLite (log eventi)
+              │
+              ▼
+        MQTT → HistoryRecorder → SQLite (CameraEvent, nuova entità)
 ```
+
+**Nota:** MQTT trasporta solo i JSON di evento (motion/person/vehicle/status), mai il flusso video: non è adatto a streaming continuo ad alto bitrate. La pipeline AI e la live view HLS si collegano entrambe direttamente alla telecamera via RTSP, indipendentemente l'una dall'altra.
 
 **AI: YOLOv8 Nano ONNX**
 - Modello pre-addestrato COCO (persone, auto, animali, 80 classi)
 - Dimensione: ~6MB, inference su CPU: ~50-100ms a 640×640
-- Libreria: `onnxruntime` (nessuna dipendenza GPU)
-- Motion detection via frame differencing (leggero, CPU <1%) → trigger per inferenza YOLO
+- Libreria: `Microsoft.ML.OnnxRuntime` (nessuna dipendenza GPU)
+- Inferenza solo sulle finestre segnalate dal motion filter (o su frame intero se il movimento copre gran parte dell'inquadratura), non ad ogni frame
 - YOLO conferma se il motion è causato da persona/veicolo/animale, riducendo falsi positivi
 
+**Motion detection + tracking: `OpenCvSharp`**
+- Motion filter: background subtractor **MOG2** (più robusto a ombre/variazioni di luce del semplice frame diff, comunque leggero)
+- Tracker per-oggetto confermato da YOLO: **CSRT** — segue l'oggetto frame per frame senza richiamare YOLO, il track viene rimosso solo quando il tracker lo perde (N miss consecutivi)
+- Dipendenza nativa (~100-150MB nell'immagine Docker): scelta perché CSRT e la cattura RTSP sono già forniti dallo stesso pacchetto; **in futuro, se si volesse eliminare la dipendenza nativa**, si può valutare un MOG2 scritto a mano in C# (algoritmo per-pixel, fattibile) più un tracker più semplice (es. correlazione/optical-flow) al posto di CSRT — non prioritario ora
+
 **Registrazione:**
-- Solo su motion event confermato (no registrazione continua)
+- Solo durante un track attivo (no registrazione continua)
 - 1 frame ogni 500ms (2 FPS) salvato come JPEG su NAS Synology (`/mnt/nas/casatimo/cameras/{id}/YYYY-MM-DD/`)
 - Retention configurabile (es. 30 giorni, poi auto-delete)
-- Evento loggato su SQLite con timestamp, camera ID, tipo oggetto rilevato, confidence
+- Evento loggato su SQLite in una nuova entità `CameraEvent` (timestamp, camera ID, tipo oggetto, confidence, path JPEG) — non riutilizza `SensorReading`, che modella singoli valori numerici
 
 **Live view in Blazor:**
-- FFmpeg transcoding RTSP → HLS (segmenti .ts ogni 2s)
+- FFmpeg transcoding RTSP → HLS (segmenti .ts ogni 2s), connessione RTSP separata da quella della pipeline AI
 - Player HLS nel browser via `hls.js`
 - Latenza attesa: 3-6s (accettabile per sorveglianza)
 - Alternativa futura a bassa latenza: WebRTC (più complesso)
@@ -370,7 +393,7 @@ CAMERA_02_RTSP=rtsp://admin:password@192.168.1.y:554/stream1
 - Il mini PC (hosting) deve avere CPU sufficiente: ~15% core per camera a 1080p con YOLOv8n
 - Con 5 telecamere stimate: ~75% di un core fisico (dipende dall'hardware)
 - Il NAS DS115j (ARM 32bit, no Docker) viene usato solo come storage SMB montato sul mini PC
-- Implementazione suggerita: una istanza Docker per camera (scalabilità, isolamento crash)
+- Deployment: un solo processo/container `CasaTimo.Camera`, un loop async per camera configurata — più semplice da gestire di un container per camera, a scapito dell'isolamento in caso di crash di una singola camera
 
 ---
 
