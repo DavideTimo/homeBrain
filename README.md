@@ -191,39 +191,37 @@ Sidecar Python indipendente che bypassa PyViCare e accede direttamente alle API 
 
 ---
 
-### STEP 5 — Connettore Huawei FusionSolar ✅ Completato (sidecar Python)
+### STEP 5 — Connettore Huawei FusionSolar ✅ Completato (sidecar Python, doppia modalità)
 
-Sidecar Python `sidecar-huawei/` che autentica sulla northbound API FusionSolar e pubblica su MQTT.
+Sidecar Python `sidecar-huawei/` con due modalità selezionabili via `HUAWEI_MODE`, entrambe pubblicano gli stessi topic MQTT.
 
-**Autenticazione:** POST `/thirdData/login` con `userName` + `systemCode` (cookie di sessione `roarand`). Re-login automatico su failCode 401.
+**Modalità `modbus` (default)** — accesso locale via `python-huawei-solar`, nessun account cloud richiesto:
+- L'inverter è raggiungibile in LAN (es. via cavo Ethernet al router) → connessione diretta `create_tcp_bridge(host, port=6607)`
+- Prerequisito: Modbus TCP abilitato dall'app FusionSolar (`Dispositivi` → `Impostazioni` → `Configurazione comunicazione`) — **ancora da fare sull'impianto**
+- Legge `ACTIVE_POWER`, `DAILY_YIELD_ENERGY` sempre; `STORAGE_STATE_OF_CAPACITY`/`STORAGE_CHARGE_DISCHARGE_POWER` solo se `bridge.battery_type != NONE`; `POWER_METER_ACTIVE_POWER`/`LOAD_POWER` solo se `bridge.power_meter_online`
+- Variabili `.env`: `HUAWEI_INVERTER_HOST` (IP locale, es. `192.168.1.100`), `HUAWEI_INVERTER_PORT` (default `6607`)
 
-**Discovery on startup:** `getStationList` → stationCode, `getDevList` → device ID per tipo (inverter=1, batteria=39, meter=47).
+**Modalità `cloud` (opzionale, tenuta come fallback futuro)** — northbound API FusionSolar:
+- Richiede un account con permessi "installer", da richiedere separatamente — non disponibile ora
+- Autenticazione: POST `/thirdData/login` con `userName` + `systemCode`, re-login automatico su failCode 401
+- Discovery: `getStationList` → stationCode, `getDevList` → device ID per tipo (inverter=1, batteria=39, meter=47)
+- Poll: `getStationRealKpi`, `getDevRealKpi` per inverter/batteria/meter
+- Variabili `.env`: `FUSIONSOLAR_USER`, `FUSIONSOLAR_SYSCODE`
 
-**Poll loop (default 300s):**
-- `getStationRealKpi` → `energy_today`
-- `getDevRealKpi` inverter → `power_active`, `load_power`
-- `getDevRealKpi` batteria → `battery_soc`, `battery_power`
-- `getDevRealKpi` grid meter → `grid_power`
-
-**Topic MQTT:**
+**Topic MQTT (comuni alle due modalità):**
 ```
 casatimo/fv/power_active     kW   produzione FV istantanea
 casatimo/fv/energy_today     kWh  energia prodotta oggi
-casatimo/fv/battery_soc      %    SOC batteria LUNA 2000
-casatimo/fv/battery_power    kW   potenza batteria (+ carica, - scarica)
-casatimo/fv/grid_power       kW   potenza rete (+ export, - import)
-casatimo/fv/load_power       kW   consumo casa istantaneo
+casatimo/fv/battery_soc      %    SOC batteria LUNA 2000 (solo se presente)
+casatimo/fv/battery_power    kW   potenza batteria (+ carica, - scarica) (solo se presente)
+casatimo/fv/grid_power       kW   potenza rete (+ export, - import) (solo se power meter presente)
+casatimo/fv/load_power       kW   consumo casa istantaneo (solo se power meter presente)
 ```
 
-**Approccio: Modbus TCP locale** (non cloud API)
-- L'API northbound FusionSolar richiede un account installer — non disponibile per utenti finali
-- Alternativa: `python-huawei-solar` si connette direttamente all'inverter sulla LAN via Modbus TCP (porta 6607), senza cloud né credenziali speciali
-- Prerequisiti: IP dell'inverter sulla rete locale + Modbus TCP abilitato dall'app FusionSolar (`Dispositivi` → `Impostazioni` → `Configurazione comunicazione`)
-- Dati ogni 30s invece di 300s (nessun rate limit cloud)
-
-**Credenziali richieste in `.env`:**
-- `HUAWEI_INVERTER_HOST` — IP locale dell'inverter (es. `192.168.1.100`)
-- `HUAWEI_INVERTER_PORT` — porta Modbus (default `6607`)
+**Da fare prima del primo avvio reale in modalità modbus:**
+1. Abilitare Modbus TCP dall'app FusionSolar sull'inverter
+2. Recuperare l'IP locale dell'inverter sulla LAN e impostarlo in `HUAWEI_INVERTER_HOST`
+3. Verificare a runtime i log di `bridge.battery_type`/`bridge.power_meter_online` per confermare che batteria e meter vengano rilevati correttamente
 
 ---
 
