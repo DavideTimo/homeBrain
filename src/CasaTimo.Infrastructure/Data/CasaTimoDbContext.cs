@@ -16,6 +16,7 @@ public class CasaTimoDbContext : DbContext
     public DbSet<MaintenanceRecord> MaintenanceRecords { get; set; }
     public DbSet<CasaTimo.Core.Models.ConnectorConfig> ConnectorConfigs { get; set; }
     public DbSet<Camera> Cameras { get; set; }
+    public DbSet<CameraEvent> CameraEvents { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -23,6 +24,10 @@ public class CasaTimoDbContext : DbContext
 
         modelBuilder.Entity<Device>().HasKey(d => d.Id);
         modelBuilder.Entity<Camera>().HasKey(c => c.Id);
+
+        modelBuilder.Entity<CameraEvent>().HasKey(e => e.Id);
+        modelBuilder.Entity<CameraEvent>()
+            .HasIndex(e => new { e.CameraId, e.Timestamp });
 
         modelBuilder.Entity<SensorReading>().HasKey(r => r.Id);
         modelBuilder.Entity<SensorReading>()

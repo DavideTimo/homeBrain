@@ -54,14 +54,25 @@ public class HistoryRecorder : BackgroundService
         return base.StopAsync(cancellationToken);
     }
 
+    // Metriche camera (STEP 13) con payload ricco (confidenza, conteggio) che vanno
+    // in CameraEvent invece che in SensorReading. fps/online restano SensorReading
+    // "normali" perché sono singoli valori numerici come qualunque altro sensore.
+    private static readonly HashSet<string> CameraEventMetrics = ["motion", "person", "vehicle", "animal"];
+
     private async Task HandleMessageAsync(string topic, string payload)
     {
-        // topic: casatimo/{deviceId}/{metric}
+        // topic: casatimo/{deviceId}/{metric} — es. casatimo/camera_{id}/person
         var parts = topic.Split('/');
         if (parts.Length < 3) return;
 
         var deviceId = parts[1];
         var metric = parts[2];
+
+        if (deviceId.StartsWith("camera_", StringComparison.Ordinal) && CameraEventMetrics.Contains(metric))
+        {
+            await HandleCameraEventAsync(deviceId, metric, payload);
+            return;
+        }
 
         double value = 0;
         string? unit = null;
@@ -101,6 +112,47 @@ public class HistoryRecorder : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "HistoryRecorder: failed to save reading for {Topic}", topic);
+        }
+    }
+
+    private async Task HandleCameraEventAsync(string deviceId, string metric, string payload)
+    {
+        double? confidence = null;
+        int? count = null;
+        string? jpegPath = null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(payload);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("confidence", out var c)) confidence = c.GetDouble();
+            if (root.TryGetProperty("count", out var n)) count = n.GetInt32();
+            if (root.TryGetProperty("jpegPath", out var p)) jpegPath = p.GetString();
+        }
+        catch (JsonException)
+        {
+            _logger.LogWarning("HistoryRecorder: payload camera non valido per {DeviceId}/{Metric}", deviceId, metric);
+        }
+
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<CasaTimoDbContext>();
+            db.CameraEvents.Add(new CameraEvent
+            {
+                CameraId = deviceId["camera_".Length..],
+                EventType = metric,
+                Confidence = confidence,
+                Count = count,
+                JpegPath = jpegPath,
+                Timestamp = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+            _logger.LogDebug("HistoryRecorder: saved camera event {DeviceId}/{Metric}", deviceId, metric);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "HistoryRecorder: failed to save camera event for {DeviceId}/{Metric}", deviceId, metric);
         }
     }
 }

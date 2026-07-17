@@ -78,7 +78,8 @@ homeBrain/
     ├── CasaTimo.Workers/             # Background services (C#)
     ├── CasaTimo.Core/                # Modelli condivisi
     ├── CasaTimo.Infrastructure/      # DB context, MQTT client, connettori
-    └── CasaTimo.Api.Tests/           # Test di integrazione xUnit (7 test)
+    ├── CasaTimo.Camera/               # Pipeline videosorveglianza (OpenCvSharp + YOLO ONNX)
+    └── CasaTimo.Api.Tests/           # Test di integrazione xUnit
 ```
 
 ---
@@ -126,7 +127,10 @@ dotnet run --project src/CasaTimo.Api
 # 3. Frontend Blazor (terminale 3)
 dotnet run --project src/CasaTimo.Web
 
-# 4. Sidecar Docker (si connettono al broker sul host via host.docker.internal:1883)
+# 4. Videosorveglianza (terminale 4, richiede models/yolov8n.onnx — vedi STEP 13)
+dotnet run --project src/CasaTimo.Camera
+
+# 5. Sidecar Docker (si connettono al broker sul host via host.docker.internal:1883)
 docker compose up viessmann-sidecar
 docker compose up huawei-sidecar        # modalità modbus di default, vedi STEP 5
 ```
@@ -302,7 +306,7 @@ WS   /ws/live    (SignalR real-time)
 
 ---
 
-### STEP 13 — Videosorveglianza con AI leggera 🟡 In corso (config/UI ✅, pipeline AI ⬜)
+### STEP 13 — Videosorveglianza con AI leggera 🟡 In corso (config/UI ✅, pipeline AI implementata ma non verificata)
 
 **Hardware previsto:** 1-2 telecamere esterne + 3-4 interne, indicativamente 5-6 telecamere — non è più un vincolo tecnico, la configurazione è dinamica (vedi sotto).
 
@@ -335,13 +339,15 @@ POST   /api/cameras/test       cattura un frame via ffmpeg per validare host/cre
 
 **UI (`CasaTimo.Web`, pagina `/telecamere`):** stessa convenzione di autenticazione JWT di `/connectors`. Elenco telecamere con badge posizione/stato, form di aggiunta/modifica (nome, posizione interna/esterna, host, porta RTSP, path main + sub-path opzionale, credenziali), pulsante "Testa connessione" con anteprima JPEG inline, eliminazione con conferma.
 
-**Nota operativa:** il progetto usa `EnsureCreated()` invece delle migrazioni EF Core — su un database `data/casatimo.db` già esistente (creato prima di questa modifica) la nuova tabella `Cameras` **non** viene aggiunta automaticamente. Su un DB esistente serve creare la tabella manualmente, oppure ripartire da un DB vuoto in sviluppo.
+**Nota operativa:** il progetto usa `EnsureCreated()` invece delle migrazioni EF Core — su un database `data/casatimo.db` già esistente (creato prima di questa modifica) le nuove tabelle `Cameras` e `CameraEvents` **non** vengono aggiunte automaticamente. Su un DB esistente serve crearle manualmente, oppure ripartire da un DB vuoto in sviluppo.
 
-#### Pipeline AI ⬜ Da fare — con OpenCvSharp
+#### Pipeline AI 🟡 Implementata in `CasaTimo.Camera` — non ancora verificata
 
-Decisione (rivista): **si usa OpenCvSharp**, non un'implementazione homemade. Motivo principale: qui non è possibile compilare/eseguire il codice per validarlo iterativamente — affidarsi ad algoritmi collaudati (MOG2, CSRT) riduce di molto il rischio di bug sottili rispetto a motion detection/tracking scritti a mano e mai eseguiti. Il costo è la dipendenza nativa (~100-150MB nell'immagine Docker), accettato.
+Decisione: **OpenCvSharp**, non un'implementazione homemade — algoritmi collaudati (MOG2, CSRT) invece di codice scritto a mano e mai eseguito, dato che qui non è possibile compilare/testare iterativamente. Il costo è la dipendenza nativa (~100-150MB), accettato.
 
-**Prima dell'implementazione in `CasaTimo.Camera`: prototipazione in un repository separato**, per validare l'algoritmo (qualità del motion filter, robustezza del tracker, CPU reale sul mini PC) senza sporcare la history di `homeBrain` con tentativi — dettagli del repo di prototipazione ancora da definire.
+Il worker `CasaTimo.Camera` (Worker Service .NET) implementa la pipeline sotto — un loop async per camera abilitata, tutte nello stesso processo, condividendo una singola `InferenceSession` ONNX. **Non è stato possibile compilare/eseguire questo codice in questo ambiente**: va verificato con `dotnet build`/`dotnet run` contro una camera reale prima di considerarlo affidabile, con un modello scaricato in `models/yolov8n.onnx` (percorso configurabile in `Camera:ModelPath`, vedi `appsettings.json`).
+
+Il repository separato `home-camera-lab` non è questa implementazione — è un esperimento indipendente su una pipeline **"solo C#, senza OpenCV"** (motion detection e resize scritti a mano, niente tracker visivo), tenuto apposta fuori da `homeBrain` per confrontare in futuro le due strade senza che l'una dipenda dall'altra.
 
 ```
 Telecamere (RTSP — 2 connessioni indipendenti per camera)
@@ -367,8 +373,8 @@ CasaTimo.Camera (Worker Service)  FFmpeg → HLS (.ts/.m3u8)
   │   → chiude l'evento
   ├── Salva JPEG su NAS a 2 FPS durante il track attivo
   └── Pubblica MQTT (solo eventi, mai i frame):
-        casatimo/cameras/{id}/motion   {"active": true/false}
-        casatimo/cameras/{id}/person   {"confidence": 0.87, "count": 1}
+        casatimo/camera_{id}/motion   {"count": 1/0, "timestamp": "..."}  (1=iniziato, 0=terminato)
+        casatimo/camera_{id}/person   {"confidence": 0.87, "count": 1, "timestamp": "..."}
               │
               ▼
         MQTT → HistoryRecorder → SQLite (CameraEvent, nuova entità;
@@ -400,7 +406,7 @@ CasaTimo.Camera (Worker Service)  FFmpeg → HLS (.ts/.m3u8)
 - Le **camere interne mettono in pausa la pipeline quando lo stato è "in casa"** — evita di tracciare continuamente chi vive lì e di generare rumore/notifiche inutili
 - Stato determinato da un **toggle manuale in UI** ("Sono in casa" / "Sono fuori"), non automatico — niente geofencing/presenza telefono per ora, rimandato a un'eventuale fase successiva
 - **Nessun riconoscimento facciale**: distinguere "io" da "uno sconosciuto" richiederebbe una pipeline separata (face detection + embedding + confronto con volti noti) sproporzionata rispetto al beneficio — il problema che risolverebbe (non essere disturbati dai propri movimenti in casa) è già coperto, in modo più semplice e affidabile, dallo stato armato/disarmato: se sei "in casa" non ricevi notifiche a prescindere da chi la telecamera vede
-- Lo stato va persistito da qualche parte (nuova piccola entità o riuso di `ConnectorConfig`-style) e controllato da `CasaTimo.Camera` prima di far girare motion+YOLO sulle camere interne — dettaglio implementativo ancora da definire quando si integrerà il prototipo del lab in `CasaTimo.Camera`
+- **Non ancora implementato**: `CameraSurveillanceWorker` oggi fa girare la pipeline su tutte le camere abilitate senza distinguere lo stato — manca sia il toggle in UI sia il controllo dello stato prima di processare le camere interne
 
 **Live view in Blazor:**
 - FFmpeg transcoding RTSP → HLS (segmenti .ts ogni 2s), connessione RTSP separata da quella della pipeline AI
@@ -408,20 +414,28 @@ CasaTimo.Camera (Worker Service)  FFmpeg → HLS (.ts/.m3u8)
 - Latenza attesa: 3-6s (accettabile per sorveglianza)
 - Alternativa futura a bassa latenza: WebRTC (più complesso)
 
-**Topic MQTT:**
+**Topic MQTT** (`deviceId` = `camera_{id}`, così `HistoryRecorder` lo riconosce con lo split `casatimo/{deviceId}/{metric}` già esistente per gli altri sensori):
 ```
-casatimo/cameras/{id}/motion    {"active": true, "timestamp": "..."}
-casatimo/cameras/{id}/person    {"confidence": 0.87, "count": 1, "timestamp": "..."}
-casatimo/cameras/{id}/vehicle   {"confidence": 0.91, "count": 1, "timestamp": "..."}
-casatimo/cameras/{id}/fps       valore numerico, riusa SensorReading (deviceId=camera_{id})
-casatimo/cameras/{id}/online    0/1, riusa SensorReading (deviceId=camera_{id})
+casatimo/camera_{id}/motion    {"count": 1/0, "timestamp": "..."}         → CameraEvent (1=iniziato, 0=terminato)
+casatimo/camera_{id}/person    {"confidence": 0.87, "count": 1, "timestamp": "..."} → CameraEvent
+casatimo/camera_{id}/vehicle   {"confidence": 0.91, "count": 1, "timestamp": "..."} → CameraEvent
+casatimo/camera_{id}/animal    {"confidence": 0.75, "count": 1, "timestamp": "..."} → CameraEvent
+casatimo/camera_{id}/fps       {"value": 12.3, "unit": "fps"}             → SensorReading (come gli altri sensori)
+casatimo/camera_{id}/online    {"value": 1, "unit": null}                 → SensorReading
 ```
+`HistoryRecorder` instrada in base al nome della metrica: `motion`/`person`/`vehicle`/`animal` finiscono in `CameraEvent`, tutto il resto (incluso `fps`/`online`) segue il percorso `SensorReading` esistente, invariato per gli altri connettori.
 
 **Note:**
 - Il mini PC (hosting) deve avere CPU sufficiente: ~15% core per camera a 1080p con YOLOv8n
 - Con 5 telecamere stimate: ~75% di un core fisico (dipende dall'hardware)
 - Il NAS DS115j (ARM 32bit, no Docker) viene usato solo come storage SMB montato sul mini PC
-- Deployment: un solo processo/container `CasaTimo.Camera`, un loop async per camera configurata (letta da `/api/cameras`, non da `.env`) — più semplice da gestire di un container per camera, a scapito dell'isolamento in caso di crash di una singola camera
+- Deployment: un solo processo/container `CasaTimo.Camera`, un loop async per camera configurata (letta dal DB via `CasaTimoDbContext`, stessa fonte di `/api/cameras`) — più semplice da gestire di un container per camera, a scapito dell'isolamento in caso di crash di una singola camera
+
+**Limiti noti di questa prima implementazione** (oltre al non essere mai stata eseguita):
+- La lista delle camere viene letta **una sola volta all'avvio** — aggiungere/modificare una camera da `/telecamere` richiede un riavvio di `CasaTimo.Camera` per essere preso in considerazione, non è dinamico
+- Nessun controllo dello stato armato/disarmato (vedi sopra) — tutte le camere abilitate girano sempre
+- `JpegPath` non è collegato ai `CameraEvent` (gli snapshot vengono scritti su NAS ma l'evento in DB non ne registra il percorso esatto)
+- Riconnessione RTSP con backoff fisso di 10s, non testata contro interruzioni di rete reali
 
 ---
 
