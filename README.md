@@ -392,8 +392,15 @@ CasaTimo.Camera (Worker Service)  FFmpeg → HLS (.ts/.m3u8)
 **Registrazione:**
 - Solo durante un track attivo (no registrazione continua)
 - 1 frame ogni 500ms (2 FPS) salvato come JPEG su NAS Synology (`/mnt/nas/casatimo/cameras/{id}/YYYY-MM-DD/`)
-- Retention configurabile (es. 30 giorni, poi auto-delete)
+- Retention: **14 giorni di default**, configurabile. Il mount SMB del NAS su `/mnt/nas/casatimo/` è un passo di setup a livello di sistema operativo del mini PC (fstab/systemd, una tantum) — `CasaTimo.Camera` scrive semplicemente su quel path. La **cancellazione automatica oltre la retention invece è responsabilità del servizio**: un task periodico (una volta al giorno) che rimuove le cartelle `YYYY-MM-DD` più vecchie della soglia, così resta configurabile dallo stesso posto di tutto il resto invece che con un cron esterno da ricordarsi
 - Evento loggato su SQLite in una nuova entità `CameraEvent` (timestamp, camera ID, tipo oggetto, confidence, path JPEG) — non riutilizza `SensorReading`, che modella singoli valori numerici
+
+**Stato armato/disarmato (Casa/Fuori):**
+- Le **camere esterne restano sempre attive**, indipendentemente dallo stato — utili anche quando si è in casa (es. qualcuno alla porta), e riusate da STEP 14 per il monitoraggio del prato
+- Le **camere interne mettono in pausa la pipeline quando lo stato è "in casa"** — evita di tracciare continuamente chi vive lì e di generare rumore/notifiche inutili
+- Stato determinato da un **toggle manuale in UI** ("Sono in casa" / "Sono fuori"), non automatico — niente geofencing/presenza telefono per ora, rimandato a un'eventuale fase successiva
+- **Nessun riconoscimento facciale**: distinguere "io" da "uno sconosciuto" richiederebbe una pipeline separata (face detection + embedding + confronto con volti noti) sproporzionata rispetto al beneficio — il problema che risolverebbe (non essere disturbati dai propri movimenti in casa) è già coperto, in modo più semplice e affidabile, dallo stato armato/disarmato: se sei "in casa" non ricevi notifiche a prescindere da chi la telecamera vede
+- Lo stato va persistito da qualche parte (nuova piccola entità o riuso di `ConnectorConfig`-style) e controllato da `CasaTimo.Camera` prima di far girare motion+YOLO sulle camere interne — dettaglio implementativo ancora da definire quando si integrerà il prototipo del lab in `CasaTimo.Camera`
 
 **Live view in Blazor:**
 - FFmpeg transcoding RTSP → HLS (segmenti .ts ogni 2s), connessione RTSP separata da quella della pipeline AI
