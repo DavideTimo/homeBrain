@@ -24,7 +24,7 @@ Sviluppo di una **web app domestica unificata** in C# / Blazor che:
 | Dispositivo | Modello | Protocollo / API |
 |---|---|---|
 | Pompa di calore | Viessmann Vitocal 222-S | API REST `api.viessmann-climatesolutions.com` |
-| Fotovoltaico + Batteria | Huawei + LUNA 2000 (20 kWh) | Huawei FusionSolar API |
+| Fotovoltaico + Batteria | Huawei + LUNA 2000 (20 kWh) | Modbus TCP locale (LAN) — cloud FusionSolar API opzionale, richiede permessi installer |
 | Clima | Daikin 5MXM 90N multisplit | Daikin Cloud API |
 | Wallbox | Gewiss GWJ3002A 7kW | OCPP |
 | Telecamere | Reolink (da acquistare, max 6) | RTSP/ONVIF — 1-2 esterne PoE, 3-4 interne WiFi |
@@ -126,7 +126,7 @@ dotnet run --project src/CasaTimo.Web
 
 # 4. Sidecar Docker (si connettono al broker sul host via host.docker.internal:1883)
 docker compose up viessmann-sidecar
-docker compose up huawei-sidecar        # quando disponibile
+docker compose up huawei-sidecar        # modalità modbus di default, vedi STEP 5
 ```
 
 ---
