@@ -302,52 +302,53 @@ WS   /ws/live    (SignalR real-time)
 
 ---
 
-### STEP 13 — Videosorveglianza con AI leggera ⬜ Da fare
+### STEP 13 — Videosorveglianza con bridge ONVIF→MQTT ⬜ Da fare
 
 **Hardware previsto:** 1-2 telecamere esterne + 3-4 interne, max 6 totali.
 
 **Requisiti hardware telecamere:**
-- Protocollo **RTSP nativo** (ONVIF compatibile) — necessario per OpenCV
+- Protocollo **ONVIF** (porta 8000) — necessario per ricevere gli eventi AI nativi e per RTSP di fallback
 - Evitare telecamere cloud-only (Tuya, Wyze senza hack, ecc.)
-- **Consigliato: Reolink**
-  - Interno: E1 Pro o E1 Outdoor (WiFi 2K, ~35€)
-  - Esterno: RLC-510A o RLC-810A (PoE, IP66, un cavo per dati + alimentazione)
+- **Consigliato: Reolink** — ha un chip AI on-device (person/vehicle/animal detection) **locale, gratuito, senza abbonamento** (Reolink Cloud serve solo per backup video offsite, non per la detection)
+  - Interno: E1 Pro (WiFi 2K, ~40€, ha anche pan/tilt + auto-tracking motorizzato)
+  - Esterno: RLC-510A o RLC-810A (PoE, IP66, un cavo per dati + alimentazione) — bullet camera fissa, stessa AI person/vehicle/animal ma **senza** auto-tracking (nessun motore pan/tilt)
   - Per le esterne preferire PoE: serve uno switch PoE (~30€)
-- Risoluzione ottimale per l'AI: **1080p/2K** (il modello YOLO ridimensiona a 640×640 internamente, il 4K spreca CPU senza migliorare l'accuracy)
+- Risoluzione 1080p/2K sufficiente: la detection gira sul chip della camera, non serve banda extra per l'inferenza lato mini PC
 
-**Architettura:**
+**Architettura — bridge invece di inferenza custom:**
+
+L'AI di rilevamento (persone/veicoli/animali) gira già dentro la camera. Il sidecar non deve rifare l'inferenza: si limita a iscriversi agli eventi nativi e a inoltrarli su MQTT.
+
 ```
-Telecamere (RTSP)
+Telecamere Reolink (ONVIF + AI on-device)
       │
       ▼
-sidecar-camera/ (Python, una istanza per telecamera o multi-camera)
-  ├── OpenCV → cattura frame via RTSP
-  ├── Frame delta leggero → motion trigger (CPU quasi zero)
-  ├── YOLOv8n ONNX → inferenza su frame con motion (~10-15 FPS su CPU mini PC)
-  ├── Salva JPEG su NAS a 2 FPS durante motion event
+sidecar-camera/ (Python, libreria reolink-aio)
+  ├── Si iscrive agli eventi AI per camera, in ordine di preferenza:
+  │     TCP push → ONVIF push → ONVIF long-polling → polling ogni 5s (fallback)
+  ├── Nessuna inferenza locale: zero carico CPU per il rilevamento
+  ├── Su evento "person"/"vehicle"/"animal" → salva JPEG (snapshot camera) su NAS
   └── Pubblica MQTT:
         casatimo/cameras/{id}/motion   {"active": true/false}
-        casatimo/cameras/{id}/person   {"confidence": 0.87, "count": 1}
+        casatimo/cameras/{id}/person   {"active": true, "timestamp": "..."}
       │
       ├── FFmpeg → HLS → Blazor (live view, latenza ~3-5s)
       └── MQTT → HistoryRecorder → SQLite (log eventi)
 ```
 
-**AI: YOLOv8 Nano ONNX**
-- Modello pre-addestrato COCO (persone, auto, animali, 80 classi)
-- Dimensione: ~6MB, inference su CPU: ~50-100ms a 640×640
-- Libreria: `onnxruntime` (nessuna dipendenza GPU)
-- Motion detection via frame differencing (leggero, CPU <1%) → trigger per inferenza YOLO
-- YOLO conferma se il motion è causato da persona/veicolo/animale, riducendo falsi positivi
+**Libreria: `reolink-aio`**
+- Client Python asincrono per le API Reolink (stessa libreria usata dall'integrazione Home Assistant)
+- Gestisce autenticazione, discovery eventi ONVIF e fallback automatico al metodo di push disponibile
+- Espone direttamente i binary sensor "person" / "vehicle" / "pet" già calcolati dalla camera — nessun modello ONNX da mantenere
 
 **Registrazione:**
-- Solo su motion event confermato (no registrazione continua)
-- 1 frame ogni 500ms (2 FPS) salvato come JPEG su NAS Synology (`/mnt/nas/casatimo/cameras/{id}/YYYY-MM-DD/`)
+- Solo su evento AI confermato dalla camera (no registrazione continua, no motion detection custom)
+- Snapshot JPEG scaricato dalla camera stessa al momento dell'evento, salvato su NAS Synology (`/mnt/nas/casatimo/cameras/{id}/YYYY-MM-DD/`)
 - Retention configurabile (es. 30 giorni, poi auto-delete)
-- Evento loggato su SQLite con timestamp, camera ID, tipo oggetto rilevato, confidence
+- Evento loggato su SQLite con timestamp, camera ID, tipo oggetto rilevato
 
 **Live view in Blazor:**
-- FFmpeg transcoding RTSP → HLS (segmenti .ts ogni 2s)
+- FFmpeg transcoding RTSP → HLS (segmenti .ts ogni 2s) — l'RTSP resta usato solo per lo streaming video, non per l'AI
 - Player HLS nel browser via `hls.js`
 - Latenza attesa: 3-6s (accettabile per sorveglianza)
 - Alternativa futura a bassa latenza: WebRTC (più complesso)
@@ -355,24 +356,31 @@ sidecar-camera/ (Python, una istanza per telecamera o multi-camera)
 **Topic MQTT:**
 ```
 casatimo/cameras/{id}/motion    {"active": true, "timestamp": "..."}
-casatimo/cameras/{id}/person    {"confidence": 0.87, "count": 1, "timestamp": "..."}
-casatimo/cameras/{id}/vehicle   {"confidence": 0.91, "count": 1, "timestamp": "..."}
-casatimo/cameras/{id}/status    {"online": true, "fps": 12.3}
+casatimo/cameras/{id}/person    {"active": true, "timestamp": "..."}
+casatimo/cameras/{id}/vehicle   {"active": true, "timestamp": "..."}
+casatimo/cameras/{id}/animal    {"active": true, "timestamp": "..."}
+casatimo/cameras/{id}/status    {"online": true}
 ```
 
 **Variabili `.env` da aggiungere per ogni camera:**
 ```
 CAMERA_01_NAME=ingresso
-CAMERA_01_RTSP=rtsp://admin:password@192.168.1.x:554/stream1
+CAMERA_01_HOST=192.168.1.x
+CAMERA_01_USER=admin
+CAMERA_01_PASS=password
 CAMERA_02_NAME=giardino
-CAMERA_02_RTSP=rtsp://admin:password@192.168.1.y:554/stream1
+CAMERA_02_HOST=192.168.1.y
+CAMERA_02_USER=admin
+CAMERA_02_PASS=password
 ```
 
+**Estensione futura opzionale — YOLOv8n ONNX:**
+Da valutare solo se serve qualcosa che l'AI nativa Reolink non copre: classi oltre persone/veicoli/animali (es. pacchi consegnati), zone di rilevamento personalizzate più fini di quelle native, o camere di altri brand senza AI onboard. In quel caso si aggiunge un modulo OpenCV + `onnxruntime` (~6MB modello COCO, ~50-100ms/frame su CPU) solo per quelle camere specifiche, mantenendo il bridge nativo per le altre.
+
 **Note:**
-- Il mini PC (hosting) deve avere CPU sufficiente: ~15% core per camera a 1080p con YOLOv8n
-- Con 5 telecamere stimate: ~75% di un core fisico (dipende dall'hardware)
+- Carico CPU sul mini PC: minimo — nessuna inferenza locale, solo bridge eventi e transcoding FFmpeg per il live view
 - Il NAS DS115j (ARM 32bit, no Docker) viene usato solo come storage SMB montato sul mini PC
-- Implementazione suggerita: una istanza Docker per camera (scalabilità, isolamento crash)
+- Implementazione suggerita: un'unica istanza `sidecar-camera` che gestisce tutte le camere via `reolink-aio` (non serve isolamento per-camera dato il carico ridotto)
 
 ---
 
@@ -428,9 +436,11 @@ set VIESSMANN_CLIENT_ID=<dal developer portal>
 - Google Gmail API .NET: https://developers.google.com/gmail/api/quickstart/dotnet
 - Blazor WASM PWA: https://learn.microsoft.com/en-us/aspnet/core/blazor/progressive-web-app
 - Cloudflare Tunnel: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
-- YOLOv8 Nano ONNX: https://github.com/ultralytics/ultralytics
-- ONNX Runtime Python: https://onnxruntime.ai/docs/get-started/with-python.html
-- Reolink RTSP URL format: `rtsp://{user}:{pass}@{ip}:554/h264Preview_01_main`
+- reolink-aio (client Python eventi AI): https://github.com/starkillerOG/reolink_aio
+- Reolink Home Assistant Integration: https://www.home-assistant.io/integrations/reolink/
+- YOLOv8 Nano ONNX (estensione opzionale): https://github.com/ultralytics/ultralytics
+- ONNX Runtime Python (estensione opzionale): https://onnxruntime.ai/docs/get-started/with-python.html
+- Reolink RTSP URL format (per live view): `rtsp://{user}:{pass}@{ip}:554/h264Preview_01_main`
 - HLS.js (player browser): https://github.com/video-dev/hls.js/
 
 ---
